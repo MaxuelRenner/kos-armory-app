@@ -6,8 +6,12 @@ import { Stack } from 'expo-router';
 import { supabase } from '../constants/supabase';
 import { Session } from '@supabase/supabase-js';
 import { Colors, Radius, Spacing } from '../constants/theme';
+import { StatusBar } from 'expo-status-bar';
+
 
 LogBox.ignoreLogs(['expo-notifications: Android Push notifications']);
+
+<StatusBar style="light" backgroundColor="#0A0B0D" />
 export default function RootLayout() {
   const [session, setSession] = useState<Session | null>(null);
   const [email, setEmail] = useState('');

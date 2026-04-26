@@ -214,7 +214,7 @@ export default function AddGunScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 }, scroll: { padding: 20, paddingBottom: 60 }, title: { fontSize: 26, fontWeight: '900', marginBottom: 20 },
+  container: { flex: 1 }, scroll: { padding: 20, paddingBottom: 60 }, title: { fontSize: 26, fontWeight: '900', marginTop: 20 },
   label: { fontSize: 13, fontWeight: '800', marginTop: 15, marginBottom: 8, letterSpacing: 1.2 }, input: { borderRadius: 10, padding: 16, borderWidth: 1, marginBottom: 12 },
   dropdown: { borderRadius: 10, padding: 12, borderWidth: 1, marginBottom: 12 }, imagePickerBox: { height: 160, borderRadius: 10, borderWidth: 1, borderStyle: 'dashed', overflow: 'hidden', marginTop: 5 },
   imagePickerPlaceholder: { flex: 1, justifyContent: 'center', alignItems: 'center' }, imagePreview: { width: '100%', height: '100%', resizeMode: 'cover' },
