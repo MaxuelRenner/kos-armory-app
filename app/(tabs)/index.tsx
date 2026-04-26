@@ -152,22 +152,32 @@ export default function ArmoryScreen() {
 
     if (data) {
       const processed = data.map((g) => {
-        const regDate = new Date(g.kos_registration_date);
-        const expiryDate = new Date(regDate);
+        // 👈 FIXED: Now checks if you've renewed it, just like the detail screen!
+        const activeDateStr = g.last_renewed_date || g.kos_registration_date;
+        const activeDate = new Date(activeDateStr);
+        const expiryDate = new Date(activeDate);
         expiryDate.setFullYear(expiryDate.getFullYear() + 5);
         const isoExpiry = expiryDate.toISOString().split('T')[0];
-        const days = getDaysUntilExpiry(isoExpiry); // now handles ISO format correctly
+        
+        const days = getDaysUntilExpiry(isoExpiry);
         let status: GunStatus = 'good';
         if (days <= 0)  status = 'danger';
-        else if (days <= 30) status = 'warning'; // fixed: was 35, now 30
-        return { ...g, kosExpiryDate: isoExpiry, kosStatus: status };
+        else if (days <= 30) status = 'warning'; 
+        
+        return { ...g, kosExpiryDate: isoExpiry, kosStatus: status, daysUntilExpiry: days };
       });
 
-      // Priority sort: expired → expiring → needs cleaning → valid
+      // Priority sort: expired (0) → expiring (1) → needs cleaning (1.5) → valid (2)
       const sorted = processed.sort((a, b) => {
-        const pa = a.needs_cleaning && a.kosStatus === 'good' ? 2 : STATUS_PRIORITY[a.kosStatus as GunStatus];
-        const pb = b.needs_cleaning && b.kosStatus === 'good' ? 2 : STATUS_PRIORITY[b.kosStatus as GunStatus];
-        return pa - pb;
+        // 👈 FIXED: Cleaning priority is 1.5 so it sits ABOVE "good" (2) but below "warning" (1)
+        const pa = a.needs_cleaning && a.kosStatus === 'good' ? 1.5 : STATUS_PRIORITY[a.kosStatus as GunStatus];
+        const pb = b.needs_cleaning && b.kosStatus === 'good' ? 1.5 : STATUS_PRIORITY[b.kosStatus as GunStatus];
+        
+        // Primary sort: by color/status
+        if (pa !== pb) return pa - pb;
+        
+        // Secondary sort: if they are the exact same status, put the one with FEWER days left at the top!
+        return a.daysUntilExpiry - b.daysUntilExpiry;
       });
 
       setGuns(sorted);

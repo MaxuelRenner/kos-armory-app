@@ -7,7 +7,6 @@
     "icon": "./assets/icon.png",
     "scheme": "kos-armory",
     "userInterfaceStyle": "dark",
-    "newArchEnabled": false,
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "cover",
