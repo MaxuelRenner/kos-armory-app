@@ -176,14 +176,31 @@ export default function AddGunScreen() {
   const handleSave = async () => {
     if (!name || !serial) return Alert.alert("Внимание", "Име и сериен номер са задължителни.");
     
-    // --- WEIGHT VALIDATION ---
+    // --- SMART WEIGHT VALIDATION ---
     const weightNum = parseInt(weight);
-    if (weight && (isNaN(weightNum) || weightNum <= 0)) {
-      return Alert.alert("Внимание", "Теглото трябва да бъде положително число.");
+    if (weight) {
+      if (isNaN(weightNum) || weightNum <= 0) {
+        return Alert.alert("Внимание", "Теглото трябва да бъде положително число.");
+      }
+
+      // 1. Задаваме границите според избрания тип
+      let minWeight = 100;
+      let maxWeight = 15000;
+
+      if (type === 'Пистолет' || type === 'Револвер') { minWeight = 100; maxWeight = 3000; }
+      else if (type === 'SMG') { minWeight = 1000; maxWeight = 5000; }
+      else if (type === 'Карабина') { minWeight = 1500; maxWeight = 8000; }
+      else if (type === 'Гладкоцевна') { minWeight = 2000; maxWeight = 6000; }
+      else if (type === 'Болтова') { minWeight = 2000; maxWeight = 12000; }
+
+      // 2. Проверяваме дали въведеното тегло е извън тези граници
+      if (weightNum < minWeight || weightNum > maxWeight) {
+        return Alert.alert(
+          "Невалидно тегло", 
+          `За тип "${type}" теглото трябва да бъде между ${minWeight} гр. и ${maxWeight} гр.`
+        );
+      }
     }
-    if (type === 'Пистолет' && weightNum > 3000) return Alert.alert("Внимание", "Пистолет не може да тежи над 3 кг.");
-    if (type === 'Револвер' && weightNum > 3000) return Alert.alert("Внимание", "Револвер не може да тежи над 3 кг.");
-    if (weightNum > 15000) return Alert.alert("Внимание", "Въведеното тегло е нереалистично (над 15 кг).");
 
     setLoading(true);
     const { data: { user } } = await supabase.auth.getUser();

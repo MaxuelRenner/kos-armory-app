@@ -18,7 +18,6 @@ export default function OnboardingScreen({ onFinish }: { onFinish?: () => void }
 
   const handleScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
     const { layoutMeasurement, contentOffset, contentSize } = event.nativeEvent;
-    // Unlocks when user is within 50 pixels of the bottom
     const isBottom = layoutMeasurement.height + contentOffset.y >= contentSize.height - 50;
     if (isBottom && !canStart) setCanStart(true);
   };
@@ -29,7 +28,7 @@ export default function OnboardingScreen({ onFinish }: { onFinish?: () => void }
         contentContainerStyle={styles.scroll} 
         showsVerticalScrollIndicator={true}
         onScroll={handleScroll}
-        scrollEventThrottle={16} // smooth scrolling detection
+        scrollEventThrottle={16}
       >
         <View style={styles.header}>
           <Ionicons name="shield-checkmark" size={60} color={theme.accent} />
@@ -38,35 +37,48 @@ export default function OnboardingScreen({ onFinish }: { onFinish?: () => void }
         </View>
 
         <View style={styles.stepContainer}>
+          
           <View style={[styles.step, { backgroundColor: theme.card, borderColor: theme.border }]}>
             <View style={[styles.iconBox, { backgroundColor: theme.input, borderColor: theme.border }]}><Ionicons name="add-circle" size={28} color={theme.accent} /></View>
             <View style={styles.stepText}>
-              <Text style={[styles.stepTitle, { color: theme.text }]}>1. Таб "Добави"</Text>
-              <Text style={[styles.stepDesc, { color: theme.muted }]}>Тук въвеждате ново оръжие. Попълнете марка, модел, калибър и точната дата на регистрация. Можете да добавите снимка от камерата или галерията. Системата автоматично изчислява кога изтича 5-годишният ви КОС.</Text>
+              <Text style={[styles.stepTitle, { color: theme.text }]}>1. Създаване на профил</Text>
+              <Text style={[styles.stepDesc, { color: theme.muted }]}>В таб "Добави" въвеждате цялата техническа информация за вашето оръжие:</Text>
+              <Text style={[styles.bullet, { color: theme.muted }]}><Text style={{ color: theme.text, fontWeight: 'bold' }}>• Спецификации:</Text> Изберете тип, марка и калибър от умните падащи менюта.</Text>
+              <Text style={[styles.bullet, { color: theme.muted }]}><Text style={{ color: theme.text, fontWeight: 'bold' }}>• Документация:</Text> Въведете датата на регистрация. Системата автоматично изчислява 5-годишния срок на КОС.</Text>
+              <Text style={[styles.bullet, { color: theme.muted }]}><Text style={{ color: theme.text, fontWeight: 'bold' }}>• Снимки:</Text> Добавете реална снимка от камерата или галерията за по-лесно разпознаване.</Text>
             </View>
           </View>
 
           <View style={[styles.step, { backgroundColor: theme.card, borderColor: theme.border }]}>
-            <View style={[styles.iconBox, { backgroundColor: theme.input, borderColor: theme.border }]}><Ionicons name="notifications" size={28} color={theme.accent} /></View>
+            <View style={[styles.iconBox, { backgroundColor: theme.input, borderColor: theme.border }]}><Ionicons name="list" size={28} color={theme.accent} /></View>
             <View style={styles.stepText}>
-              <Text style={[styles.stepTitle, { color: theme.text }]}>2. Таб "Арсенал"</Text>
-              <Text style={[styles.stepDesc, { color: theme.muted }]}>Главният екран показва вашите оръжия, сортирани по спешност. Изтичащите разрешителни светят в червено и оранжево. Можете да филтрирате оръжията си по тип и калибър чрез менютата.</Text>
+              <Text style={[styles.stepTitle, { color: theme.text }]}>2. Вашият цифров арсенал</Text>
+              <Text style={[styles.stepDesc, { color: theme.muted }]}>Главният екран е вашето командно табло:</Text>
+              <Text style={[styles.bullet, { color: theme.muted }]}><Text style={{ color: theme.text, fontWeight: 'bold' }}>• Умно сортиране:</Text> Оръжията с изтичащ КОС или нужда от почистване автоматично излизат най-отгоре.</Text>
+              <Text style={[styles.bullet, { color: theme.muted }]}><Text style={{ color: theme.text, fontWeight: 'bold' }}>• Цветови кодове:</Text> Зелено (Валидно), Оранжево (Под 30 дни), Червено (Изтекло).</Text>
+              <Text style={[styles.bullet, { color: theme.muted }]}><Text style={{ color: theme.text, fontWeight: 'bold' }}>• Търсачка и Филтри:</Text> Намерете нужното оръжие по сериен номер, калибър или тип за секунди.</Text>
             </View>
           </View>
 
           <View style={[styles.step, { backgroundColor: theme.card, borderColor: theme.border }]}>
             <View style={[styles.iconBox, { backgroundColor: theme.input, borderColor: theme.border }]}><Ionicons name="document-text" size={28} color={theme.accent} /></View>
             <View style={styles.stepText}>
-              <Text style={[styles.stepTitle, { color: theme.text }]}>3. Документи и КОС</Text>
-              <Text style={[styles.stepDesc, { color: theme.muted }]}>Точно 30 дни преди да изтече срокът, ще получите известие. В профила на оръжието има списък с нужните документи. Бутонът за подновяване се отключва едва когато съберете всички документи и сте в 30-дневния срок.</Text>
+              <Text style={[styles.stepTitle, { color: theme.text }]}>3. Управление на КОС</Text>
+              <Text style={[styles.stepDesc, { color: theme.muted }]}>Никога повече глоби за пропуснати срокове!</Text>
+              <Text style={[styles.bullet, { color: theme.muted }]}><Text style={{ color: theme.text, fontWeight: 'bold' }}>• Известия:</Text> Получавате напомняне точно 30 дни преди изтичане на разрешителното.</Text>
+              <Text style={[styles.bullet, { color: theme.muted }]}><Text style={{ color: theme.text, fontWeight: 'bold' }}>• Чеклист с документи:</Text> В профила на оръжието има пълен списък с нужните документи за подновяване.</Text>
+              <Text style={[styles.bullet, { color: theme.muted }]}><Text style={{ color: theme.text, fontWeight: 'bold' }}>• Подновяване:</Text> Бутонът се отключва автоматично само когато съберете всички документи и влезете в 30-дневния срок.</Text>
             </View>
           </View>
 
           <View style={[styles.step, { backgroundColor: theme.card, borderColor: theme.border }]}>
             <View style={[styles.iconBox, { backgroundColor: theme.input, borderColor: theme.border }]}><Ionicons name="flame" size={28} color={theme.accent} /></View>
             <View style={styles.stepText}>
-              <Text style={[styles.stepTitle, { color: theme.text }]}>4. Поддръжка</Text>
-              <Text style={[styles.stepDesc, { color: theme.muted }]}>След стрелба натиснете "Тренировка". Ще получавате известия за почистване в продължение на 5 часа, за да не забравите да поддържате оръжието си.</Text>
+              <Text style={[styles.stepTitle, { color: theme.text }]}>4. Тренировки и Поддръжка</Text>
+              <Text style={[styles.stepDesc, { color: theme.muted }]}>Грижата за оръжието е ключова:</Text>
+              <Text style={[styles.bullet, { color: theme.muted }]}><Text style={{ color: theme.text, fontWeight: 'bold' }}>• Брояч на тренировки:</Text> Всяко натискане на "Тренировка" се записва в историята на оръжието.</Text>
+              <Text style={[styles.bullet, { color: theme.muted }]}><Text style={{ color: theme.text, fontWeight: 'bold' }}>• Умни напомняния:</Text> След стрелба, системата ще ви подсеща да почистите оръжието си на всеки час.</Text>
+              <Text style={[styles.bullet, { color: theme.muted }]}><Text style={{ color: theme.text, fontWeight: 'bold' }}>• Индикатор:</Text> Оръжието ще свети с маркер "За почистване", докато не отбележите, че е поддържано.</Text>
             </View>
           </View>
           
@@ -84,11 +96,13 @@ export default function OnboardingScreen({ onFinish }: { onFinish?: () => void }
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 }, scroll: { padding: 24, paddingBottom: 60 }, header: { alignItems: 'center', marginTop: 30, marginBottom: 40 },
+  container: { flex: 1 }, scroll: { padding: 20, paddingBottom: 60 }, header: { alignItems: 'center', marginTop: 30, marginBottom: 30 },
   title: { fontSize: 32, fontWeight: '900', marginTop: 15 }, subtitle: { fontSize: 13, textAlign: 'center', marginTop: 8, lineHeight: 20 },
-  stepContainer: { gap: 20 }, step: { flexDirection: 'row', alignItems: 'flex-start', gap: 16, padding: 20, borderRadius: 16, borderWidth: 1 },
-  iconBox: { width: 50, height: 50, borderRadius: 25, borderWidth: 1, justifyContent: 'center', alignItems: 'center' },
-  stepText: { flex: 1 }, stepTitle: { fontSize: 16, fontWeight: '800', marginBottom: 6 }, stepDesc: { fontSize: 13, lineHeight: 22 },
+  stepContainer: { gap: 20 }, step: { flexDirection: 'column', padding: 20, borderRadius: 16, borderWidth: 1 },
+  iconBox: { width: 50, height: 50, borderRadius: 25, borderWidth: 1, justifyContent: 'center', alignItems: 'center', marginBottom: 15 },
+  stepText: { flex: 1 }, stepTitle: { fontSize: 18, fontWeight: '800', marginBottom: 8 }, 
+  stepDesc: { fontSize: 13, lineHeight: 22, marginBottom: 10 },
+  bullet: { fontSize: 13, lineHeight: 20, marginBottom: 6, paddingLeft: 5 },
   scrollHint: { textAlign: 'center', fontWeight: '800', fontSize: 12, marginTop: 20, marginBottom: 40 },
   footer: { padding: 20, borderTopWidth: 1 }, btn: { paddingVertical: 18, borderRadius: 12, alignItems: 'center' }, btnText: { fontWeight: '900', letterSpacing: 1.5, fontSize: 13 }
 });

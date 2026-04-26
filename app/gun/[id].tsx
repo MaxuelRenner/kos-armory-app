@@ -235,7 +235,9 @@ export default function GunDetailScreen() {
 
   const handleClean = async () => { 
     Alert.alert("Готово", "Оръжието е почистено!");
-    await supabase.from('firearms').update({ needs_cleaning: false, last_cleaned: new Date().toISOString() }).eq('id', id);
+    
+    // 👇 FIXED: Changed 'last_cleaned' to 'last_cleaned_date' to match your database!
+    await supabase.from('firearms').update({ needs_cleaning: false, last_cleaned_date: new Date().toISOString() }).eq('id', id);
   
   try {
     await Notifications.cancelAllScheduledNotificationsAsync(); 
@@ -261,18 +263,28 @@ export default function GunDetailScreen() {
           </TouchableOpacity>
           
           <View style={styles.heroInfo}>
-            {/* 👈 FIXED: HERO TEXT AND DYNAMIC COUNTER SIDE BY SIDE */}
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
               
+              {/* LEFT SIDE: Name & Serial */}
               <View style={{ flex: 1, paddingRight: 10 }}>
                 <Text style={[styles.heroTypeText, { color: theme.accent }]}>{gun.type?.toUpperCase()}</Text>
                 <Text style={[styles.heroName, { color: theme.text }]}>{gun.name}</Text>
                 <Text style={[styles.heroSerial, { color: theme.muted }]}>S/N: {gun.serial_number}</Text>
               </View>
 
-              <View style={[styles.counterBox, { backgroundColor: theme.input, borderColor: theme.border }]}>
-                <Text style={[styles.counterNumber, { color: theme.text }]}>{gun.training_count || 0}</Text>
-                <Text style={[styles.counterLabel, { color: theme.muted }]}>ТРЕНИРОВКИ</Text>
+              {/* RIGHT SIDE: Counter & Cleaning Badge */}
+              <View style={{ alignItems: 'flex-end', gap: 8 }}>
+                <View style={[styles.counterBox, { backgroundColor: theme.input, borderColor: theme.border }]}>
+                  <Text style={[styles.counterNumber, { color: theme.text }]}>{gun.training_count || 0}</Text>
+                  <Text style={[styles.counterLabel, { color: theme.muted }]}>ТРЕНИРОВКИ</Text>
+                </View>
+                
+                {/* 👈 THE NEW CLEANING BADGE */}
+                {gun.needs_cleaning && (
+                  <View style={styles.cleaningBadge}>
+                    <Text style={styles.cleaningBadgeText}>⚠ ЗА ПОЧИСТВАНЕ</Text>
+                  </View>
+                )}
               </View>
 
             </View>
@@ -361,6 +373,8 @@ const styles = StyleSheet.create({
   counterBox: { paddingHorizontal: 16, paddingVertical: 10, borderRadius: 14, borderWidth: 1, alignItems: 'center', justifyContent: 'center', minWidth: 90 },
   counterNumber: { fontSize: 26, fontWeight: '900' },
   counterLabel: { fontSize: 9, fontWeight: '800', letterSpacing: 1, marginTop: 2 },
+  cleaningBadge: { backgroundColor: 'rgba(245,158,11,0.12)', borderWidth: 1, borderColor: 'rgba(245,158,11,0.35)', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 4, alignItems: 'center' },
+  cleaningBadgeText: { fontSize: 9, fontWeight: '800', color: '#FCD34D', letterSpacing: 0.5 },
 
   statusPill: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 20, borderWidth: 1, alignSelf: 'flex-start' }, statusDot: { width: 6, height: 6, borderRadius: 3 }, statusPillText: { fontSize: 10, fontWeight: '800' }, statusDaysText: { fontSize: 10, opacity: 0.8 },
   actionRow: { flexDirection: 'row', gap: 10, marginBottom: 15 }, actionBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, padding: 15, borderRadius: 12, borderWidth: 1 }, actionLabel: { fontWeight: '700', fontSize: 13 },

@@ -124,7 +124,7 @@ function GunCard({ gun, onPress }: { gun: any; onPress: () => void }) {
 
         {/* Cleaning badge — shows when gun needs cleaning after a range day */}
         {gun.needs_cleaning && (
-          <CleaningBadge lastCleaned={gun.last_cleaned} />
+          <CleaningBadge lastCleaned={gun.last_cleaned_date} />
         )}
 
         <StatusBadge status={status} expiryDate={gun.kosExpiryDate} />
