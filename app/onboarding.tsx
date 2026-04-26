@@ -1,67 +1,72 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, Dimensions } from 'react-native';
+import React from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, ScrollView } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
-const { width } = Dimensions.get('window');
-
-const SLIDES = [
-  {
-    title: "Добре дошли в Арсенал БГ",
-    description: "Вашият дигитален асистент за управление на лични оръжия и документация.",
-    icon: "shield-checkmark"
-  },
-  {
-    title: "Край на глобите за КОС",
-    description: "Автоматични известия 30 дни преди изтичане на разрешителното ви, плюс списък с нужните документи.",
-    icon: "notifications"
-  },
-  {
-    title: "Поддръжка на оръжието",
-    description: "Отбелязвайте тренировки и получавайте напомняния за почистване, за да запазите оръжието си в перфектно състояние.",
-    icon: "build"
-  }
-];
-
-// ADDED onFinish PROP TO FIX THE ROUTING LOOP
 export default function OnboardingScreen({ onFinish }: { onFinish?: () => void }) {
-  const [step, setStep] = useState(0);
   const router = useRouter();
 
-  const handleNext = async () => {
-    if (step < SLIDES.length - 1) {
-      setStep(step + 1);
+  const handleStart = async () => {
+    await AsyncStorage.setItem('has_seen_onboarding', 'true');
+    if (onFinish) {
+      onFinish(); // Startup flow
     } else {
-      await AsyncStorage.setItem('has_seen_onboarding', 'true');
-      
-      // FIX: If passed a prop, use it (during startup). Otherwise, go back (from Settings).
-      if (onFinish) {
-        onFinish();
-      } else {
-        router.back();
-      }
+      router.back(); // Opened from Settings
     }
   };
 
-  const slide = SLIDES[step];
-
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.content}>
-        <Ionicons name={slide.icon as any} size={100} color="#B71C1C" style={{ marginBottom: 40 }} />
-        <Text style={styles.title}>{slide.title}</Text>
-        <Text style={styles.description}>{slide.description}</Text>
-      </View>
-
-      <View style={styles.footer}>
-        <View style={styles.dots}>
-          {SLIDES.map((_, i) => (
-            <View key={i} style={[styles.dot, i === step && styles.dotActive]} />
-          ))}
+      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+        
+        <View style={styles.header}>
+          <Ionicons name="shield-checkmark" size={60} color="#B71C1C" />
+          <Text style={styles.title}>Арсенал БГ</Text>
+          <Text style={styles.subtitle}>Как работи вашият дигитален асистент?</Text>
         </View>
-        <TouchableOpacity style={styles.btn} onPress={handleNext}>
-          <Text style={styles.btnText}>{step === SLIDES.length - 1 ? 'ЗАПОЧНИ' : 'НАПРЕД'}</Text>
+
+        <View style={styles.stepContainer}>
+          {/* STEP 1 */}
+          <View style={styles.step}>
+            <View style={styles.iconBox}>
+              <Ionicons name="add-circle" size={28} color="#B71C1C" />
+            </View>
+            <View style={styles.stepText}>
+              <Text style={styles.stepTitle}>1. Добавете оръжие</Text>
+              <Text style={styles.stepDesc}>Въведете модел, сериен номер и дата на регистрация. Приложението автоматично изчислява кога изтича КОС.</Text>
+            </View>
+          </View>
+
+          {/* STEP 2 */}
+          <View style={styles.step}>
+            <View style={styles.iconBox}>
+              <Ionicons name="notifications" size={28} color="#B71C1C" />
+            </View>
+            <View style={styles.stepText}>
+              <Text style={styles.stepTitle}>2. Напомняния за КОС</Text>
+              <Text style={styles.stepDesc}>Ще получите известие точно 30 дни преди изтичане на разрешителното, заедно с пълен списък с нужните документи за подновяване.</Text>
+            </View>
+          </View>
+
+          {/* STEP 3 */}
+          <View style={styles.step}>
+            <View style={styles.iconBox}>
+              <Ionicons name="flame" size={28} color="#B71C1C" />
+            </View>
+            <View style={styles.stepText}>
+              <Text style={styles.stepTitle}>3. Тренировки и Поддръжка</Text>
+              <Text style={styles.stepDesc}>След като стреляте на стрелбището, натиснете "Тренировка". Ще получавате известия да почистите оръжието си.</Text>
+            </View>
+          </View>
+        </View>
+
+      </ScrollView>
+
+      {/* FIXED BOTTOM BUTTON */}
+      <View style={styles.footer}>
+        <TouchableOpacity style={styles.btn} onPress={handleStart}>
+          <Text style={styles.btnText}>РАЗБРАХ, ЗАПОЧНИ</Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>
@@ -70,13 +75,25 @@ export default function OnboardingScreen({ onFinish }: { onFinish?: () => void }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#121212' },
-  content: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 30 },
-  title: { fontSize: 28, fontWeight: '900', color: '#E0E0E0', textAlign: 'center', marginBottom: 15 },
-  description: { fontSize: 16, color: '#6B7280', textAlign: 'center', lineHeight: 24 },
-  footer: { padding: 40, alignItems: 'center' },
-  dots: { flexDirection: 'row', marginBottom: 30 },
-  dot: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#2A2A2A', marginHorizontal: 5 },
-  dotActive: { backgroundColor: '#B71C1C', width: 20 },
-  btn: { backgroundColor: '#B71C1C', paddingVertical: 15, paddingHorizontal: 40, borderRadius: 12 },
-  btnText: { color: 'white', fontWeight: '900', letterSpacing: 1.5 }
+  scroll: { padding: 24, paddingBottom: 40 },
+  header: { alignItems: 'center', marginTop: 30, marginBottom: 40 },
+  title: { fontSize: 32, fontWeight: '900', color: '#E0E0E0', marginTop: 15 },
+  subtitle: { fontSize: 14, color: '#6B7280', textAlign: 'center', marginTop: 8 },
+  stepContainer: { gap: 20 },
+  step: { 
+    flexDirection: 'row', alignItems: 'center', gap: 16, 
+    backgroundColor: '#1C1C1E', padding: 20, 
+    borderRadius: 16, borderWidth: 1, borderColor: '#2A2A2A' 
+  },
+  iconBox: {
+    width: 50, height: 50, borderRadius: 25, 
+    backgroundColor: '#151515', borderWidth: 1, borderColor: '#2A2A2A',
+    justifyContent: 'center', alignItems: 'center'
+  },
+  stepText: { flex: 1 },
+  stepTitle: { fontSize: 16, fontWeight: '800', color: '#E0E0E0', marginBottom: 6 },
+  stepDesc: { fontSize: 13, color: '#8A9BB0', lineHeight: 20 },
+  footer: { padding: 20, borderTopWidth: 1, borderTopColor: '#2A2A2A', backgroundColor: '#121212' },
+  btn: { backgroundColor: '#B71C1C', paddingVertical: 18, borderRadius: 12, alignItems: 'center' },
+  btnText: { color: 'white', fontWeight: '900', letterSpacing: 1.5, fontSize: 15 }
 });
