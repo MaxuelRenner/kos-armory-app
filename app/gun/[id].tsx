@@ -1,10 +1,12 @@
+import { Linking } from 'react-native';
 import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView, StyleSheet, SafeAreaView, Alert, ActivityIndicator, TouchableOpacity, Image } from 'react-native';
 import { useLocalSearchParams, Stack, useRouter } from 'expo-router';
 import * as Notifications from 'expo-notifications';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as ImagePicker from 'expo-image-picker'; // 👈 FIXED: ADDED MISSING IMPORT
 import { supabase } from '../../constants/supabase';
-import { GunStatus, getStatusLabel, getDaysUntilExpiry } from '../../constants/mockData';
+import { GunStatus, getStatusLabel, getDaysUntilExpiry } from '../../constants/kosLogic';
 import { Colors, Spacing, Radius } from '../../constants/theme';
 import { useTheme } from '../../context/ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
@@ -54,6 +56,45 @@ export default function GunDetailScreen() {
   const [loading, setLoading] = useState(true);
   const [checklist, setChecklist] = useState(INITIAL_CHECKLIST);
 
+  const handleUpdateImage = () => {
+    Alert.alert("Смяна на снимка", "Изберете метод:", [
+      { 
+        text: "Камера", 
+        onPress: async () => {
+          const { status } = await ImagePicker.requestCameraPermissionsAsync();
+          if (status === 'granted') processImageUpdate(await ImagePicker.launchCameraAsync({ allowsEditing: true, aspect: [4, 3], quality: 0.5 }));
+        }
+      },
+      { 
+        text: "Галерия", 
+        onPress: async () => {
+          processImageUpdate(await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, allowsEditing: true, aspect: [4, 3], quality: 0.5 }));
+        }
+      },
+      { text: "Отказ", style: "cancel" }
+    ]);
+  };
+
+  const processImageUpdate = async (result: any) => {
+    if (result.canceled || !result.assets) return;
+    setLoading(true);
+    try {
+      const uri = result.assets[0].uri;
+      const fileExt = uri.substring(uri.lastIndexOf('.') + 1);
+      const fileName = `gun_${Date.now()}.${fileExt}`;
+      const formData = new FormData();
+      formData.append('file', { uri, name: fileName, type: `image/${fileExt === 'jpg' ? 'jpeg' : fileExt}` } as any);
+      
+      const { error: uploadError } = await supabase.storage.from('gun-images').upload(fileName, formData);
+      if (!uploadError) {
+        const { data: publicUrlData } = supabase.storage.from('gun-images').getPublicUrl(fileName);
+        await supabase.from('firearms').update({ image_url: publicUrlData.publicUrl }).eq('id', id);
+        fetchGunDetails();
+      }
+    } catch (err) { console.error(err); Alert.alert("Грешка", "Снимката не бе запазена."); }
+    setLoading(false);
+  };
+
   useEffect(() => { 
     fetchGunDetails(); 
     requestPermissions(); 
@@ -68,7 +109,6 @@ export default function GunDetailScreen() {
   async function fetchGunDetails() {
     const { data, error } = await supabase.from('firearms').select('*').eq('id', id).single();
     if (data) {
-      // SMART DATE LOGIC: Calculate based on last renewal, or fallback to first registration
       const activeDateStr = data.last_renewed_date || data.kos_registration_date;
       const activeDate = new Date(activeDateStr);
       const expiryDate = new Date(activeDate.setFullYear(activeDate.getFullYear() + 5));
@@ -76,7 +116,7 @@ export default function GunDetailScreen() {
       const days = getDaysUntilExpiry(isoExpiry);
       
       let status: GunStatus = 'good';
-      if (days <= 0) status = 'danger'; else if (days <= 35) status = 'warning';
+      if (days <= 0) status = 'danger'; else if (days <= 30) status = 'warning'; // 👈 FIXED: 30 DAYS
       
       setGun({ ...data, kosExpiryDate: isoExpiry, kosStatus: status, daysUntilExpiry: days });
     }
@@ -91,7 +131,6 @@ export default function GunDetailScreen() {
   };
 
   const toggleChecklistItem = async (index: number) => {
-    // BUG FIX: Create a deep copy so React doesn't share references
     const newList = checklist.map((item, i) => 
       i === index ? { ...item, checked: !item.checked } : item
     );
@@ -102,7 +141,7 @@ export default function GunDetailScreen() {
   // CHECK RENEWAL CONDITIONS
   const completedDocsCount = checklist.filter(item => item.checked).length;
   const allDocsCollected = completedDocsCount === checklist.length;
-  const isWithinRenewalWindow = gun?.daysUntilExpiry <= 30; // CHANGED FROM 7 TO 30
+  const isWithinRenewalWindow = gun?.daysUntilExpiry <= 30;
   const canRenew = allDocsCollected && isWithinRenewalWindow;
 
   const handleRenewKOS = async () => {
@@ -117,19 +156,16 @@ export default function GunDetailScreen() {
             setLoading(true);
             const today = new Date().toISOString().split('T')[0];
             
-            // 1. Update Database with new renewal date
             const { error } = await supabase.from('firearms').update({ last_renewed_date: today }).eq('id', id);
             
             if (error) {
               Alert.alert("Грешка", error.message);
             } else {
-              // 2. Wipe the checklist clean for the next 5 years
               const resetList = checklist.map(item => ({ ...item, checked: false }));
               setChecklist(resetList);
               await AsyncStorage.setItem(`kos_checklist_${id}`, JSON.stringify(resetList));
               
               Alert.alert("Успешно!", "Разрешителното е подновено за нови 5 години!");
-              // 3. Reload the gun data to update the UI
               fetchGunDetails();
             }
             setLoading(false);
@@ -139,18 +175,13 @@ export default function GunDetailScreen() {
     );
   };
 
-// --- ACTIONS ---
 const handleTraining = async () => {
   Alert.alert("Тренировка", "Стрелбата е отчетена. Ще получавате известия за почистване през следващите 5 часа.");
-  
-  // 1. Mark in Supabase
   await supabase.from('firearms').update({ needs_cleaning: true, last_range_day: new Date().toISOString() }).eq('id', id);
-  // 2. Schedule up to 5 hourly notifications
   await scheduleCleaningReminders(gun.name);
-  fetchGunDetails(); // Refresh UI
+  fetchGunDetails();
 };
 
-// --- DELETE AND CANCEL NOTIFICATIONS ---
 const handleDelete = async () => {
   Alert.alert(
     "Премахване на оръжие",
@@ -162,15 +193,9 @@ const handleDelete = async () => {
         style: "destructive", 
         onPress: async () => {
           setLoading(true);
-          
-          // 1. CANCEL THE GHOST NOTIFICATIONS FOR THIS SPECIFIC GUN!
           await Notifications.cancelScheduledNotificationAsync(`clean_${id}`);
           await Notifications.cancelScheduledNotificationAsync(`kos_${id}`);
-
-          // 2. Wipe the checklist memory for this gun
           await AsyncStorage.removeItem(`kos_checklist_${id}`);
-
-          // 3. Delete from Supabase
           const { error } = await supabase.from('firearms').delete().eq('id', id);
           
           if (error) {
@@ -188,12 +213,9 @@ const handleDelete = async () => {
 
 const handleClean = async () => { 
   Alert.alert("Готово", "Оръжието е почистено!");
-  // 1. Clear flag in Supabase
   await supabase.from('firearms').update({ needs_cleaning: false, last_cleaned: new Date().toISOString() }).eq('id', id);
-  // 2. Cancel the annoying hourly reminders
-  // Note: Assuming you store IDs or clear all pending for simplicity:
   await Notifications.cancelAllScheduledNotificationsAsync(); 
-  fetchGunDetails(); // Refresh UI
+  fetchGunDetails();
 };
 
   if (loading) return <View style={[styles.container, { backgroundColor: theme.bg, justifyContent: 'center' }]}><ActivityIndicator color={theme.accent} /></View>;
@@ -205,9 +227,12 @@ const handleClean = async () => {
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
         
         <View style={[styles.heroCard, { backgroundColor: theme.card, borderColor: theme.border, borderTopColor: Colors.status[gun.kosStatus as GunStatus].dot }]}>
-          <View style={styles.heroImageArea}>
-            {gun.image_url ? <Image source={{ uri: gun.image_url }} style={styles.heroImage} /> : <Text style={{ color: theme.muted }}>[НЯМА СНИМКА]</Text>}
-          </View>
+          <TouchableOpacity style={styles.heroImageArea} onPress={handleUpdateImage} activeOpacity={0.8}>
+            {gun.image_url ? <Image source={{ uri: gun.image_url }} style={styles.heroImage} /> : <Text style={{ color: theme.muted }}>[ДОБАВИ СНИМКА]</Text>}
+            <View style={{ position: 'absolute', top: 10, right: 10, backgroundColor: 'rgba(0,0,0,0.6)', padding: 8, borderRadius: 20 }}>
+              <Ionicons name="camera-reverse" size={20} color="#fff" />
+            </View>
+          </TouchableOpacity>
           <View style={styles.heroInfo}>
             <Text style={[styles.heroTypeText, { color: theme.accent }]}>{gun.type?.toUpperCase()}</Text>
             <Text style={[styles.heroName, { color: theme.text }]}>{gun.name}</Text>
@@ -227,7 +252,6 @@ const handleClean = async () => {
           </TouchableOpacity>
         </View>
 
-        {/* UPDATED SPECS WITH RENEWAL DATES */}
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: theme.muted }]}>ДЕТАЙЛИ</Text>
           <View style={[styles.specsCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
@@ -247,22 +271,21 @@ const handleClean = async () => {
           </View>
 
           {checklist.map((item, index) => (
-  <View key={item.id} style={[styles.checklistRow, { alignItems: 'flex-start' }]}>
-    <TouchableOpacity style={{ flexDirection: 'row', flex: 1, alignItems: 'center', gap: 12 }} onPress={() => toggleChecklistItem(index)} activeOpacity={0.7}>
-      <Ionicons name={item.checked ? "checkbox" : "square-outline"} size={24} color={item.checked ? theme.accent : theme.muted} />
-      <Text style={[styles.checklistItemText, { color: item.checked ? theme.muted : theme.text, textDecorationLine: item.checked ? 'line-through' : 'none' }]}>
-        {item.label}
-      </Text>
-    </TouchableOpacity>
-    
-    {/* TOOLTIP BUTTON */}
-    <TouchableOpacity onPress={() => Alert.alert("Информация", item.info)} style={{ padding: 4 }}>
-      <Ionicons name="information-circle-outline" size={22} color={theme.accent} />
-    </TouchableOpacity>
-  </View>
-))}
+            <View key={item.id} style={[styles.checklistRow, { alignItems: 'flex-start' }]}>
+              <TouchableOpacity style={{ flexDirection: 'row', flex: 1, alignItems: 'center', gap: 12 }} onPress={() => toggleChecklistItem(index)} activeOpacity={0.7}>
+                <Ionicons name={item.checked ? "checkbox" : "square-outline"} size={24} color={item.checked ? theme.accent : theme.muted} />
+                <Text style={[styles.checklistItemText, { color: item.checked ? theme.muted : theme.text, textDecorationLine: item.checked ? 'line-through' : 'none' }]}>
+                  {item.label}
+                </Text>
+              </TouchableOpacity>
+              
+              {/* 👈 FIXED: TOOLTIP BUTTON NOW REDIRECTS DIRECTLY TO MVR */}
+              <TouchableOpacity onPress={() => Linking.openURL('https://mvr.bg/services/administrative-services/weapons')} style={{ padding: 4 }}>
+                <Ionicons name="information-circle-outline" size={22} color={theme.accent} />
+              </TouchableOpacity>
+            </View>
+          ))}
           
-          {/* THE SMART RENEW BUTTON */}
           <TouchableOpacity 
             style={[styles.renewBtn, { backgroundColor: canRenew ? theme.accent : theme.input, borderColor: theme.border, opacity: canRenew ? 1 : 0.6 }]} 
             disabled={!canRenew}
@@ -273,8 +296,8 @@ const handleClean = async () => {
             </Text>
           </TouchableOpacity>
           
-          {/* Helper Text to explain why it's locked */}
-          {!isWithinRenewalWindow && <Text style={[styles.helperText, { color: theme.muted }]}>* Опцията се отключва 7 дни преди изтичане</Text>}
+          {/* 👈 FIXED: HELPER TEXT NOW SAYS 30 DAYS */}
+          {!isWithinRenewalWindow && <Text style={[styles.helperText, { color: theme.muted }]}>* Опцията се отключва 30 дни преди изтичане</Text>}
           {isWithinRenewalWindow && !allDocsCollected && <Text style={[styles.helperText, { color: theme.accent }]}>* Отбележете всички документи за да подновите</Text>}
 
         </View>

@@ -135,11 +135,26 @@ export default function AddGunScreen() {
   const [showPicker, setShowPicker] = useState(false);
   const [imageObject, setImageObject] = useState<ImagePicker.ImagePickerAsset | null>(null);
 
-  const pickImage = async () => {
-    let result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images, allowsEditing: true, aspect: [4, 3], quality: 0.5,
-    });
-    if (!result.canceled && result.assets && result.assets.length > 0) setImageObject(result.assets[0]);
+  const pickImage = () => {
+    Alert.alert("Снимка", "Изберете метод за добавяне на снимка:", [
+      { 
+        text: "Камера", 
+        onPress: async () => {
+          const { status } = await ImagePicker.requestCameraPermissionsAsync();
+          if (status !== 'granted') return Alert.alert('Грешка', 'Нужен е достъп до камерата.');
+          let result = await ImagePicker.launchCameraAsync({ allowsEditing: true, aspect: [4, 3], quality: 0.5 });
+          if (!result.canceled && result.assets) setImageObject(result.assets[0]);
+        }
+      },
+      { 
+        text: "Галерия", 
+        onPress: async () => {
+          let result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, allowsEditing: true, aspect: [4, 3], quality: 0.5 });
+          if (!result.canceled && result.assets) setImageObject(result.assets[0]);
+        }
+      },
+      { text: "Отказ", style: "cancel" }
+    ]);
   };
 
   const handleSave = async () => {

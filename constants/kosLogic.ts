@@ -44,3 +44,26 @@ export function getKosStatus(expiryDateStr: string): KosStatus {
   if (daysLeft <= 30) return 'warning';  // expiring within 30 days
   return 'good';
 }
+
+export type GunStatus = 'good' | 'warning' | 'danger';
+
+export function getStatusLabel(status: GunStatus): string {
+  switch (status) {
+    case 'good': return 'Валидно разрешително';
+    case 'warning': return 'За подновяване';
+    case 'danger': return 'Изтекло разрешително';
+  }
+}
+
+export function getDaysUntilExpiry(expiryDateStr: string): number {
+  let expiry: Date;
+  if (expiryDateStr.includes('-')) {
+    expiry = new Date(expiryDateStr);
+  } else {
+    const [day, month, year] = expiryDateStr.split('.').map(Number);
+    expiry = new Date(year, month - 1, day);
+  }
+  const now = new Date();
+  const diff = new Date(expiry.toDateString()).getTime() - new Date(now.toDateString()).getTime();
+  return Math.ceil(diff / (1000 * 60 * 60 * 24));
+}

@@ -7,9 +7,10 @@ import {
 import { useRouter } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
 import { supabase } from '../../constants/supabase';
-import { GunStatus, getStatusLabel, getDaysUntilExpiry } from '../../constants/mockData';
+import { GunStatus, getStatusLabel, getDaysUntilExpiry } from '../../constants/kosLogic';
 import { Colors, Spacing, Radius, Shadow } from '../../constants/theme';
 import { useTheme } from '../../context/ThemeContext';
+import { Dropdown } from 'react-native-element-dropdown';
 
 const { width } = Dimensions.get('window');
 const CARD_WIDTH = (width - Spacing.md * 2 - Spacing.sm) / 2;
@@ -17,8 +18,39 @@ const CARD_WIDTH = (width - Spacing.md * 2 - Spacing.sm) / 2;
 // Priority: expired (0) → expiring soon (1) → needs cleaning (2) → valid (3)
 const STATUS_PRIORITY: Record<GunStatus, number> = { danger: 0, warning: 1, good: 2 };
 
-const GUN_TYPES = ['Всички', 'Пистолет', 'Карабина', 'Ловна пушка', 'Друго'];
-const CALIBER_GROUPS = ['Всички', '9мм', '7.62мм', '.45 ACP', '12 калибър', 'Друг'];
+const FILTER_TYPES = [
+  { label: 'Всички', value: 'Всички' },
+  { label: 'Пистолет', value: 'Пистолет' },
+  { label: 'SMG', value: 'SMG' },
+  { label: 'Карабина', value: 'Карабина' },
+  { label: 'Гладкоцевна', value: 'Гладкоцевна' },
+  { label: 'Болтова', value: 'Болтова' },
+  { label: 'Револвер', value: 'Револвер' }
+];
+
+const FILTER_CALIBERS = [
+  { label: 'Всички', value: 'Всички' },
+  { label: '.22 LR', value: '.22 LR' },
+  { label: '9x19mm', value: '9x19mm' },
+  { label: '9x18mm Makarov', value: '9x18mm Makarov' },
+  { label: '.38 Special', value: '.38 Special' },
+  { label: '.357 Magnum', value: '.357 Magnum' },
+  { label: '.40 S&W', value: '.40 S&W' },
+  { label: '.45 ACP', value: '.45 ACP' },
+  { label: '10mm Auto', value: '10mm Auto' },
+  { label: '.44 Magnum', value: '.44 Magnum' },
+  { label: '5.56x45mm', value: '5.56x45mm' },
+  { label: '7.62x39mm', value: '7.62x39mm' },
+  { label: '7.62x51mm', value: '7.62x51mm' },
+  { label: '7.62x54mmR', value: '7.62x54mmR' },
+  { label: '6.5mm Creedmoor', value: '6.5mm Creedmoor' },
+  { label: '.300 Blackout', value: '.300 Blackout' },
+  { label: '12 Gauge', value: '12 Gauge' },
+  { label: '20 Gauge', value: '20 Gauge' },
+  { label: '.338 Lapua', value: '.338 Lapua' },
+  { label: '5.7x28mm', value: '5.7x28mm' },
+  { label: 'Друго', value: 'Друго' }
+];
 
 // ─── STATUS BADGE ─────────────────────────────────────────────────────────────
 function StatusBadge({ status, expiryDate }: { status: GunStatus; expiryDate: string }) {
@@ -49,37 +81,6 @@ function CleaningBadge({ lastCleaned }: { lastCleaned: string | null }) {
           Последно: {new Date(lastCleaned).toLocaleDateString('bg-BG')}
         </Text>
       )}
-    </View>
-  );
-}
-
-// ─── FILTER CHIPS ─────────────────────────────────────────────────────────────
-function FilterChips({
-  label, options, selected, onSelect,
-}: {
-  label: string; options: string[]; selected: string; onSelect: (v: string) => void;
-}) {
-  const { theme } = useTheme();
-  return (
-    <View style={styles.filterRow}>
-      <Text style={[styles.filterLabel, { color: theme.muted }]}>{label}:</Text>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipsScroll}>
-        {options.map((opt) => (
-          <TouchableOpacity
-            key={opt}
-            onPress={() => onSelect(opt)}
-            style={[
-              styles.chip,
-              { borderColor: theme.border, backgroundColor: theme.input },
-              selected === opt && { borderColor: theme.accent, backgroundColor: theme.accent + '22' },
-            ]}
-          >
-            <Text style={[styles.chipText, { color: selected === opt ? theme.accent : theme.muted }]}>
-              {opt}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
     </View>
   );
 }
@@ -190,15 +191,11 @@ export default function ArmoryScreen() {
         gun.serial_number?.toLowerCase().includes(q) ||
         gun.manufacturer?.toLowerCase().includes(q);
 
-      const matchesType = typeFilter === 'Всички' || gun.gun_type === typeFilter;
+      // 👈 FIXED: We use gun.type instead of gun.gun_type!
+      const matchesType = typeFilter === 'Всички' || gun.type === typeFilter;
 
-      const matchesCaliber =
-        caliberFilter === 'Всички' ||
-        (caliberFilter === '9мм' && gun.caliber?.includes('9')) ||
-        (caliberFilter === '7.62мм' && gun.caliber?.includes('7.62')) ||
-        (caliberFilter === '.45 ACP' && gun.caliber?.includes('.45')) ||
-        (caliberFilter === '12 калибър' && gun.caliber?.includes('12')) ||
-        (caliberFilter === 'Друг');
+      // 👈 FIXED: Safely checks if caliber exists
+      const matchesCaliber = caliberFilter === 'Всички' || (gun.caliber && gun.caliber.includes(caliberFilter));
 
       return matchesSearch && matchesType && matchesCaliber;
     });
@@ -249,9 +246,32 @@ export default function ArmoryScreen() {
             </View>
 
             {/* Filters */}
-            <FilterChips label="Тип" options={GUN_TYPES} selected={typeFilter} onSelect={setTypeFilter} />
-            <FilterChips label="Калибър" options={CALIBER_GROUPS} selected={caliberFilter} onSelect={setCaliberFilter} />
-
+            <View style={{ flexDirection: 'row', gap: 10, marginBottom: 15 }}>
+              <Dropdown 
+                style={[styles.filterDropdown, { backgroundColor: theme.input, borderColor: theme.border }]} 
+                selectedTextStyle={{ color: theme.accent, fontSize: 12, fontWeight: '700' }} 
+                placeholderStyle={{ color: theme.muted, fontSize: 12 }} 
+                containerStyle={{ backgroundColor: theme.card, borderColor: theme.border }} 
+                itemTextStyle={{ color: theme.text, fontSize: 12 }} 
+                activeColor={theme.border} 
+                data={FILTER_TYPES} // 👈 NO .map() HERE!
+                labelField="label" valueField="value" value={typeFilter} 
+                placeholder="Всички типове" // 👈 FIXES THE ENGLISH
+                onChange={i => setTypeFilter(i.value)} 
+              />
+              <Dropdown 
+                style={[styles.filterDropdown, { backgroundColor: theme.input, borderColor: theme.border }]} 
+                selectedTextStyle={{ color: theme.accent, fontSize: 12, fontWeight: '700' }} 
+                placeholderStyle={{ color: theme.muted, fontSize: 12 }} 
+                containerStyle={{ backgroundColor: theme.card, borderColor: theme.border }} 
+                itemTextStyle={{ color: theme.text, fontSize: 12 }} 
+                activeColor={theme.border} 
+                data={FILTER_CALIBERS} // 👈 NO .map() HERE!
+                labelField="label" valueField="value" value={caliberFilter} 
+                placeholder="Всички калибри" // 👈 FIXES THE ENGLISH
+                onChange={i => setCaliberFilter(i.value)} 
+              />
+            </View>
             {/* Expired alert banner */}
             {filteredGuns.some((g) => g.kosStatus === 'danger') && (
               <View style={styles.alertBanner}>
@@ -323,4 +343,5 @@ const styles = StyleSheet.create({
   cleaningBadge: { backgroundColor: 'rgba(245,158,11,0.12)', borderWidth: 1, borderColor: 'rgba(245,158,11,0.35)', borderRadius: 5, paddingHorizontal: 5, paddingVertical: 3 },
   cleaningBadgeText: { fontSize: 8, fontWeight: '800', color: '#FCD34D', letterSpacing: 0.5 },
   cleaningDate: { fontSize: 7, color: '#F59E0B', marginTop: 1 },
+  filterDropdown: { flex: 1, borderRadius: 10, padding: 12, borderWidth: 1 }
 });
