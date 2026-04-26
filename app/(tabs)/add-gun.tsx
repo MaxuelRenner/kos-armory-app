@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import { View, Text, TextInput, ScrollView, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, Platform, Image } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useFocusEffect } from '@react-navigation/native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { Dropdown } from 'react-native-element-dropdown';
 import * as ImagePicker from 'expo-image-picker';
@@ -21,30 +22,36 @@ const TYPE_DATA = [
   { label: 'Револвер', value: 'Револвер' }
 ];
 
-// Replace CALIBER_DATA with this:
 const CALIBERS_BY_TYPE: Record<string, { label: string, value: string }[]> = {
   'Пистолет': [
-    { label: '9x19mm Parabellum', value: '9x19mm' }, { label: '.45 ACP', value: '.45 ACP' }, 
-    { label: '.22 LR', value: '.22 LR' }, { label: '.380 ACP', value: '.380 ACP' }
-  ],
-  'Карабина': [
-    { label: '5.56x45mm NATO', value: '5.56x45mm' }, { label: '7.62x39mm (AK)', value: '7.62x39mm' },
-    { label: '7.62x51mm NATO', value: '7.62x51mm' }, { label: '.300 Blackout', value: '.300 Blackout' }
-  ],
-  'Ловна пушка (Гладкоцевна)': [
-    { label: '12 Gauge', value: '12 Gauge' }, { label: '20 Gauge', value: '20 Gauge' }
-  ],
-  'Болтова карабина': [
-    { label: '.308 Win', value: '.308 Win' }, { label: '6.5mm Creedmoor', value: '6.5mm Creedmoor' },
-    { label: '.338 Lapua', value: '.338 Lapua' }
+    { label: '9x19mm Parabellum', value: '9x19mm' }, { label: '9x18mm Makarov', value: '9x18mm Makarov' },
+    { label: '.45 ACP', value: '.45 ACP' }, { label: '.380 ACP', value: '.380 ACP' },
+    { label: '10mm Auto', value: '10mm Auto' }, { label: '.22 LR', value: '.22 LR' },
+    { label: '7.62x25mm Tokarev', value: '7.62x25mm' }, { label: 'Друго', value: 'Друго' }
   ],
   'Револвер': [
     { label: '.357 Magnum', value: '.357 Magnum' }, { label: '.38 Special', value: '.38 Special' },
-    { label: '.44 Magnum', value: '.44 Magnum' }
+    { label: '.44 Magnum', value: '.44 Magnum' }, { label: '.22 LR', value: '.22 LR' }, { label: 'Друго', value: 'Друго' }
   ],
-  'Картечен пистолет (SMG)': [
+  'SMG': [
     { label: '9x19mm Parabellum', value: '9x19mm' }, { label: '.45 ACP', value: '.45 ACP' },
-    { label: '5.7x28mm (FN)', value: '5.7x28mm' }
+    { label: '5.7x28mm (FN)', value: '5.7x28mm' }, { label: 'Друго', value: 'Друго' }
+  ],
+  'Карабина': [
+    { label: '5.56x45mm NATO / .223', value: '5.56x45mm' }, { label: '7.62x39mm (AK)', value: '7.62x39mm' },
+    { label: '7.62x51mm NATO / .308', value: '7.62x51mm' }, { label: '5.45x39mm', value: '5.45x39mm' },
+    { label: '.300 Blackout', value: '.300 Blackout' }, { label: 'Друго', value: 'Друго' }
+  ],
+  'Болтова': [
+    { label: '.308 Winchester', value: '.308 Win' }, { label: '6.5mm Creedmoor', value: '6.5mm Creedmoor' },
+    { label: '.30-06 Springfield', value: '.30-06' }, { label: '.300 Win Mag', value: '.300 Win Mag' },
+    { label: '.338 Lapua Magnum', value: '.338 Lapua' }, { label: '7.62x54mmR', value: '7.62x54mmR' },
+    { label: 'Друго', value: 'Друго' }
+  ],
+  'Гладкоцевна': [
+    { label: '12 Gauge', value: '12 Gauge' }, { label: '16 Gauge', value: '16 Gauge' },
+    { label: '20 Gauge', value: '20 Gauge' }, { label: '.410 Bore', value: '.410 Bore' },
+    { label: 'Друго', value: 'Друго' }
   ]
 };
 
@@ -135,26 +142,35 @@ export default function AddGunScreen() {
   const [showPicker, setShowPicker] = useState(false);
   const [imageObject, setImageObject] = useState<ImagePicker.ImagePickerAsset | null>(null);
 
-  const pickImage = () => {
-    Alert.alert("Снимка", "Изберете метод за добавяне на снимка:", [
-      { 
-        text: "Камера", 
-        onPress: async () => {
-          const { status } = await ImagePicker.requestCameraPermissionsAsync();
-          if (status !== 'granted') return Alert.alert('Грешка', 'Нужен е достъп до камерата.');
-          let result = await ImagePicker.launchCameraAsync({ allowsEditing: true, aspect: [4, 3], quality: 0.5 });
-          if (!result.canceled && result.assets) setImageObject(result.assets[0]);
+  // Track if we are currently using the camera/gallery so the app doesn't wipe the form
+  const isPickingImage = useRef(false);
+
+  // 👈 FIXED: Wipe the form cleanly whenever the user leaves the screen!
+  useFocusEffect(
+    useCallback(() => {
+      // This runs when screen loses focus (user navigates away)
+      return () => {
+        if (!isPickingImage.current) {
+          setName(''); setSerial(''); setWeight(''); setBarrelLength(''); setCapacity('');
+          setImageObject(null); setDate(new Date()); setType('Пистолет'); setManufacturer('Glock'); setCaliber('9x19mm');
         }
-      },
-      { 
-        text: "Галерия", 
-        onPress: async () => {
-          let result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, allowsEditing: true, aspect: [4, 3], quality: 0.5 });
-          if (!result.canceled && result.assets) setImageObject(result.assets[0]);
-        }
-      },
-      { text: "Отказ", style: "cancel" }
-    ]);
+      };
+    }, [])
+  );
+
+  const pickImage = async () => {
+    isPickingImage.current = true; // Lock the wipe flag!
+
+    let result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images, allowsEditing: true, aspect: [4, 3], quality: 0.5,
+    });
+
+    if (!result.canceled && result.assets && result.assets.length > 0) {
+      setImageObject(result.assets[0]);
+    }
+
+    // Unlock the wipe flag after a small delay to ensure the OS has fully returned to the app
+    setTimeout(() => { isPickingImage.current = false; }, 500);
   };
 
   const handleSave = async () => {
@@ -226,9 +242,41 @@ export default function AddGunScreen() {
       <TextInput style={[styles.input, { backgroundColor: theme.input, borderColor: theme.border, color: activeTextColor }]} value={serial} onChangeText={setSerial} placeholder="S/N..." placeholderTextColor={theme.muted} />
 
       <Text style={[styles.label, { color: theme.accent }]}>Спецификации</Text>
-      <Dropdown style={[styles.dropdown, { backgroundColor: theme.input, borderColor: theme.border }]} selectedTextStyle={{ color: activeTextColor }} placeholderStyle={{ color: theme.muted }} containerStyle={{ backgroundColor: theme.card, borderColor: theme.border }} itemTextStyle={{ color: activeTextColor }} activeColor={theme.border} data={TYPE_DATA} labelField="label" valueField="value" value={type} onChange={i => { setType(i.value); setManufacturer(MFR_MAP[i.value][0].value); }} />
-      <Dropdown style={[styles.dropdown, { backgroundColor: theme.input, borderColor: theme.border }]} selectedTextStyle={{ color: activeTextColor }} placeholderStyle={{ color: theme.muted }} containerStyle={{ backgroundColor: theme.card, borderColor: theme.border }} itemTextStyle={{ color: activeTextColor }} activeColor={theme.border} data={MFR_MAP[type] || MFR_MAP['Пистолет']} labelField="label" valueField="value" value={manufacturer} onChange={i => setManufacturer(i.value)} />
-      <Dropdown style={[styles.dropdown, { backgroundColor: theme.input, borderColor: theme.border }]} selectedTextStyle={{ color: activeTextColor }} placeholderStyle={{ color: theme.muted }} containerStyle={{ backgroundColor: theme.card, borderColor: theme.border }} itemTextStyle={{ color: activeTextColor }} activeColor={theme.border} data={CALIBERS_BY_TYPE[type] || CALIBERS_BY_TYPE['Пистолет']} labelField="label" valueField="value" value={caliber} onChange={i => setCaliber(i.value)} />
+      
+      <Dropdown 
+        style={[styles.dropdown, { backgroundColor: theme.input, borderColor: theme.border }]} 
+        selectedTextStyle={{ color: activeTextColor }} placeholderStyle={{ color: theme.muted }} 
+        containerStyle={{ backgroundColor: theme.card, borderColor: theme.border }} itemTextStyle={{ color: activeTextColor }} activeColor={theme.border} 
+        data={TYPE_DATA} labelField="label" valueField="value" value={type} placeholder="Избери тип" 
+        onChange={i => { 
+          setType(i.value); 
+          const firstMfr = MFR_MAP[i.value]?.[0]?.value || 'Друго';
+          const firstCaliber = CALIBERS_BY_TYPE[i.value]?.[0]?.value || 'Друго';
+          setManufacturer(firstMfr); 
+          setCaliber(firstCaliber); // 👈 Auto-switches caliber to match the new gun type
+        }} 
+      />
+      
+      <Dropdown 
+        style={[styles.dropdown, { backgroundColor: theme.input, borderColor: theme.border }]} 
+        selectedTextStyle={{ color: activeTextColor }} placeholderStyle={{ color: theme.muted }} 
+        containerStyle={{ backgroundColor: theme.card, borderColor: theme.border }} itemTextStyle={{ color: activeTextColor }} activeColor={theme.border} 
+        data={MFR_MAP[type] || MFR_MAP['Пистолет']} labelField="label" valueField="value" value={manufacturer} placeholder="Избери марка" 
+        onChange={i => {
+          setManufacturer(i.value);
+          if (i.value === 'Arsenal' && type === 'Пистолет') setCaliber('9x18mm Makarov'); // 👈 Auto-selects 9x18 for Makarov
+        }} 
+      />
+      
+      <Dropdown 
+        style={[styles.dropdown, { backgroundColor: theme.input, borderColor: theme.border }]} 
+        selectedTextStyle={{ color: activeTextColor }} placeholderStyle={{ color: theme.muted }} 
+        containerStyle={{ backgroundColor: theme.card, borderColor: theme.border }} itemTextStyle={{ color: activeTextColor }} activeColor={theme.border} 
+        // 👈 If Makarov, only show 9x18 and 9x19. Otherwise, show the list for that specific gun type!
+        data={manufacturer === 'Arsenal' && type === 'Пистолет' ? [{ label: '9x18mm Makarov', value: '9x18mm Makarov' }, { label: '9x19mm Parabellum', value: '9x19mm' }, { label: 'Друго', value: 'Друго' }] : (CALIBERS_BY_TYPE[type] || CALIBERS_BY_TYPE['Пистолет'])} 
+        labelField="label" valueField="value" value={caliber} placeholder="Избери калибър" 
+        onChange={i => setCaliber(i.value)} 
+      />
 
       <View style={{ flexDirection: 'row', gap: 10, marginTop: 5 }}>
         <TextInput style={[styles.input, { flex: 1, backgroundColor: theme.input, borderColor: theme.border, color: activeTextColor }]} value={weight} onChangeText={setWeight} placeholder="Тегло (гр)" keyboardType="numeric" placeholderTextColor={theme.muted} />
