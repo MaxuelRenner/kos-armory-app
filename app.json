@@ -41,9 +41,11 @@
       ]
     ],
     "extra": {
+      "router": {},
       "eas": {
-        "projectId": "31cd8a92-e1c0-48b2-beca-d59099dfaca3"
+        "projectId": "2a581a11-22c1-4398-ab62-168249430e25"
       }
-    }
+    },
+    "owner": "maxuelrenner"
   }
 }
