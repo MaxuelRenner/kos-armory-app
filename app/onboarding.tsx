@@ -24,7 +24,8 @@ const SLIDES = [
   }
 ];
 
-export default function OnboardingScreen() {
+// ADDED onFinish PROP TO FIX THE ROUTING LOOP
+export default function OnboardingScreen({ onFinish }: { onFinish?: () => void }) {
   const [step, setStep] = useState(0);
   const router = useRouter();
 
@@ -33,7 +34,13 @@ export default function OnboardingScreen() {
       setStep(step + 1);
     } else {
       await AsyncStorage.setItem('has_seen_onboarding', 'true');
-      router.replace('/');
+      
+      // FIX: If passed a prop, use it (during startup). Otherwise, go back (from Settings).
+      if (onFinish) {
+        onFinish();
+      } else {
+        router.back();
+      }
     }
   };
 
