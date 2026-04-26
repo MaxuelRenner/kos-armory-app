@@ -8,6 +8,7 @@ import { GunStatus, getStatusLabel, getDaysUntilExpiry } from '../../constants/m
 import { Colors, Spacing, Radius } from '../../constants/theme';
 import { useTheme } from '../../context/ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
+import { scheduleCleaningReminders, cancelCleaningReminders } from '../../constants/notifications';
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({ shouldShowAlert: true, shouldPlaySound: true, shouldSetBadge: false, shouldShowBanner: true, shouldShowList: true }),
@@ -36,12 +37,12 @@ function SpecRow({ label, value }: { label: string; value: string }) {
 }
 
 const INITIAL_CHECKLIST = [
-  { id: 'form', label: 'Заявление по образец', checked: false },
-  { id: 'idCard', label: 'Лична карта (копие)', checked: false },
-  { id: 'criminalRecord', label: 'Свидетелство за съдимост', checked: false },
-  { id: 'medical', label: 'Медицинско свидетелство от психодиспансер', checked: false },
-  { id: 'fee', label: 'Документ за платена държавна такса', checked: false },
-  { id: 'technical', label: 'Удостоверение за годност (Технически преглед)', checked: false },
+  { id: 'form', label: 'Заявление по образец', info: 'Взема се на място от гише КОС или се изтегля от сайта на МВР.', checked: false },
+  { id: 'idCard', label: 'Лична карта (копие)', info: 'Копие от двете страни. Носете и оригинала за сверка.', checked: false },
+  { id: 'criminalRecord', label: 'Свидетелство за съдимост', info: 'Важи 6 месеца. Изважда се от Районния съд.', checked: false },
+  { id: 'medical', label: 'Медицинско свидетелство', info: 'От психодиспансер + печат от личен лекар. Важи 6 месеца.', checked: false },
+  { id: 'fee', label: 'Платена държавна такса', info: 'Плаща се на гише или по банков път към МВР.', checked: false },
+  { id: 'technical', label: 'Удостоверение за годност', info: 'Издава се от лицензиран оръжеен майстор след преглед.', checked: false },
 ];
 
 export default function GunDetailScreen() {
@@ -90,8 +91,10 @@ export default function GunDetailScreen() {
   };
 
   const toggleChecklistItem = async (index: number) => {
-    const newList = [...checklist];
-    newList[index].checked = !newList[index].checked;
+    // BUG FIX: Create a deep copy so React doesn't share references
+    const newList = checklist.map((item, i) => 
+      i === index ? { ...item, checked: !item.checked } : item
+    );
     setChecklist(newList);
     await AsyncStorage.setItem(`kos_checklist_${id}`, JSON.stringify(newList));
   };
@@ -99,7 +102,7 @@ export default function GunDetailScreen() {
   // CHECK RENEWAL CONDITIONS
   const completedDocsCount = checklist.filter(item => item.checked).length;
   const allDocsCollected = completedDocsCount === checklist.length;
-  const isWithinRenewalWindow = gun?.daysUntilExpiry <= 7; // 7 Days before expiry
+  const isWithinRenewalWindow = gun?.daysUntilExpiry <= 30; // CHANGED FROM 7 TO 30
   const canRenew = allDocsCollected && isWithinRenewalWindow;
 
   const handleRenewKOS = async () => {
@@ -136,38 +139,17 @@ export default function GunDetailScreen() {
     );
   };
 
-// --- NOTIFICATION ACTIONS ---
+// --- ACTIONS ---
 const handleTraining = async () => {
-  Alert.alert("Тренировка", "Стрелбата е отчетена. Ще получите известие за почистване след 5 часа.");
-  await Notifications.scheduleNotificationAsync({
-    identifier: `clean_${id}`,
-    content: { 
-      title: "Поддръжка на оръжието 🧼", 
-      body: `Изминаха 5 часа от стрелбата с ${gun.name}. Време е за почистване!`, 
-      sound: true 
-    },
-    trigger: { 
-      type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL, 
-      seconds: 5 * 60 * 60 // Real-world: 5 hours
-    },
-  });
-};
-const handleTestKOS = async () => {
-  Alert.alert("Напомняне за КОС", "Настроено е известие за 30 дни преди изтичане на разрешителното.");
+  Alert.alert("Тренировка", "Стрелбата е отчетена. Ще получавате известия за почистване през следващите 5 часа.");
   
-  const expiryDate = new Date(gun.kosExpiryDate);
-  const reminderDate = new Date(expiryDate.getTime() - (30 * 24 * 60 * 60 * 1000));
-  
-  await Notifications.scheduleNotificationAsync({
-    identifier: `kos_${id}`,
-    content: { 
-      title: "⚠ КОС Изтича след месец", 
-      body: `Разрешителното за ${gun.name} изтича скоро. Започнете събирането на документи!`, 
-      sound: true 
-    },
-    trigger: { date: reminderDate } as any, 
-  });
+  // 1. Mark in Supabase
+  await supabase.from('firearms').update({ needs_cleaning: true, last_range_day: new Date().toISOString() }).eq('id', id);
+  // 2. Schedule up to 5 hourly notifications
+  await scheduleCleaningReminders(gun.name);
+  fetchGunDetails(); // Refresh UI
 };
+
 // --- DELETE AND CANCEL NOTIFICATIONS ---
 const handleDelete = async () => {
   Alert.alert(
@@ -204,7 +186,15 @@ const handleDelete = async () => {
   );
 };
 
-  const handleClean = () => { Alert.alert("Готово", "Оръжието е маркирано като почистено."); };
+const handleClean = async () => { 
+  Alert.alert("Готово", "Оръжието е почистено!");
+  // 1. Clear flag in Supabase
+  await supabase.from('firearms').update({ needs_cleaning: false, last_cleaned: new Date().toISOString() }).eq('id', id);
+  // 2. Cancel the annoying hourly reminders
+  // Note: Assuming you store IDs or clear all pending for simplicity:
+  await Notifications.cancelAllScheduledNotificationsAsync(); 
+  fetchGunDetails(); // Refresh UI
+};
 
   if (loading) return <View style={[styles.container, { backgroundColor: theme.bg, justifyContent: 'center' }]}><ActivityIndicator color={theme.accent} /></View>;
   if (!gun) return <View style={[styles.container, { backgroundColor: theme.bg }]}><Text style={{ color: theme.text, textAlign: 'center', marginTop: 40 }}>Оръжието не е намерено.</Text></View>;
@@ -237,10 +227,6 @@ const handleDelete = async () => {
           </TouchableOpacity>
         </View>
 
-        <TouchableOpacity style={[styles.testBtn, { borderColor: theme.accent }]} onPress={handleTestKOS}>
-          <Text style={{ color: theme.accent, fontWeight: '700', fontSize: 12 }}>Тест: 30 мин известие за КОС</Text>
-        </TouchableOpacity>
-
         {/* UPDATED SPECS WITH RENEWAL DATES */}
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: theme.muted }]}>ДЕТАЙЛИ</Text>
@@ -260,14 +246,21 @@ const handleDelete = async () => {
             <Text style={{ color: theme.accent, fontSize: 12, fontWeight: '800' }}>{completedDocsCount} / {checklist.length}</Text>
           </View>
 
-          <View style={[styles.specsCard, { backgroundColor: theme.card, borderColor: theme.border, padding: 15 }]}>
-            {checklist.map((item, index) => (
-              <TouchableOpacity key={item.id} style={styles.checklistRow} onPress={() => toggleChecklistItem(index)} activeOpacity={0.7}>
-                <Ionicons name={item.checked ? "checkbox" : "square-outline"} size={24} color={item.checked ? theme.accent : theme.muted} />
-                <Text style={[styles.checklistItemText, { color: item.checked ? theme.muted : theme.text, textDecorationLine: item.checked ? 'line-through' : 'none', opacity: item.checked ? 0.6 : 1 }]}>{item.label}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
+          {checklist.map((item, index) => (
+  <View key={item.id} style={[styles.checklistRow, { alignItems: 'flex-start' }]}>
+    <TouchableOpacity style={{ flexDirection: 'row', flex: 1, alignItems: 'center', gap: 12 }} onPress={() => toggleChecklistItem(index)} activeOpacity={0.7}>
+      <Ionicons name={item.checked ? "checkbox" : "square-outline"} size={24} color={item.checked ? theme.accent : theme.muted} />
+      <Text style={[styles.checklistItemText, { color: item.checked ? theme.muted : theme.text, textDecorationLine: item.checked ? 'line-through' : 'none' }]}>
+        {item.label}
+      </Text>
+    </TouchableOpacity>
+    
+    {/* TOOLTIP BUTTON */}
+    <TouchableOpacity onPress={() => Alert.alert("Информация", item.info)} style={{ padding: 4 }}>
+      <Ionicons name="information-circle-outline" size={22} color={theme.accent} />
+    </TouchableOpacity>
+  </View>
+))}
           
           {/* THE SMART RENEW BUTTON */}
           <TouchableOpacity 
@@ -302,7 +295,6 @@ const styles = StyleSheet.create({
   heroInfo: { padding: Spacing.md, gap: 4 }, heroTypeText: { fontSize: 11, fontWeight: '800', letterSpacing: 1.5 }, heroName: { fontSize: 32, fontWeight: '900' }, heroSerial: { fontSize: 12, fontFamily: 'Courier New', marginBottom: 6 },
   statusPill: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 20, borderWidth: 1, alignSelf: 'flex-start' }, statusDot: { width: 6, height: 6, borderRadius: 3 }, statusPillText: { fontSize: 10, fontWeight: '800' }, statusDaysText: { fontSize: 10, opacity: 0.8 },
   actionRow: { flexDirection: 'row', gap: 10, marginBottom: 15 }, actionBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, padding: 15, borderRadius: 12, borderWidth: 1 }, actionLabel: { fontWeight: '700', fontSize: 13 },
-  testBtn: { padding: 12, borderWidth: 1, borderRadius: 8, borderStyle: 'dashed', alignItems: 'center', marginBottom: 20 },
   section: { marginBottom: Spacing.lg }, checklistHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, paddingHorizontal: 5 },
   sectionTitle: { fontSize: 11, letterSpacing: 2, marginBottom: 12, fontWeight: '800', marginLeft: 5 }, specsCard: { borderRadius: Radius.lg, borderWidth: 1, overflow: 'hidden' }, specRow: { flexDirection: 'row', justifyContent: 'space-between', padding: Spacing.md, borderBottomWidth: 1 }, specLabel: { fontSize: 13, fontWeight: '600' }, specValue: { fontSize: 13, fontWeight: '700' },
   checklistRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 16 }, checklistItemText: { fontSize: 13, fontWeight: '600', flex: 1, lineHeight: 20 },

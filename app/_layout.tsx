@@ -2,10 +2,12 @@ import { LogBox } from 'react-native';
 import { ThemeProvider } from '../context/ThemeContext';
 import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, SafeAreaView } from 'react-native';
-import { Stack } from 'expo-router';
+import { Stack, useRouter } from 'expo-router';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '../constants/supabase';
 import { Session } from '@supabase/supabase-js';
 import { Colors, Radius, Spacing } from '../constants/theme';
+import { requestNotificationPermissions } from '../constants/notifications';
 import { StatusBar } from 'expo-status-bar';
 
 
@@ -18,18 +20,33 @@ export default function RootLayout() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [isReady, setIsReady] = useState(false);
+  const [needsOnboarding, setNeedsOnboarding] = useState(false); // NEW STATE
+  const router = useRouter(); // IMPORTANT: import { Stack, useRouter } from 'expo-router';
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    requestNotificationPermissions();
+
+    const checkAppReady = async () => {
+      // Check onboarding
+      const hasSeen = await AsyncStorage.getItem('has_seen_onboarding');
+      if (hasSeen !== 'true') setNeedsOnboarding(true);
+
+      // Check session
+      const { data: { session } } = await supabase.auth.getSession();
       setSession(session);
       setIsReady(true);
-    });
+      
+      if (hasSeen !== 'true') {
+        router.replace('/onboarding');
+      }
+    };
+    
+    checkAppReady();
 
     supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
     });
   }, []);
-
   async function signInWithEmail() {
     setLoading(true);
     const { error } = await supabase.auth.signInWithPassword({ email, password });

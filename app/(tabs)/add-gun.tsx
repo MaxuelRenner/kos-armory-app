@@ -8,6 +8,7 @@ import { decode } from 'base64-arraybuffer'; // THIS FIXED THE ERROR SCREEN!
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../../constants/supabase';
 import { useTheme } from '../../context/ThemeContext';
+import { scheduleKosRenewalNotification } from '../../constants/notifications';
 
 // ─── MASSIVE DATABASES ────────────────────────────────────────────────────────
 
@@ -20,26 +21,32 @@ const TYPE_DATA = [
   { label: 'Револвер', value: 'Револвер' }
 ];
 
-const CALIBER_DATA = [ 
-  // Handgun
-  { label: '.22 LR', value: '.22 LR' }, { label: '9x19mm Parabellum', value: '9x19mm' }, 
-  { label: '.38 Special', value: '.38 Special' }, { label: '.357 Magnum', value: '.357 Magnum' },
-  { label: '.40 S&W', value: '.40 S&W' }, { label: '.45 ACP', value: '.45 ACP' }, { label: '10mm Auto', value: '10mm Auto' },
-  { label: '.44 Magnum', value: '.44 Magnum' }, { label: '.50 Action Express (AE)', value: '.50 AE' },
-  { label: '7.62x25mm Tokarev', value: '7.62x25mm' }, { label: '9x18mm Makarov', value: '9x18mm Makarov' },
-  { label: '5.7x28mm (FN)', value: '5.7x28mm' },
-  // Rifle
-  { label: '5.56x45mm NATO / .223 Rem', value: '5.56x45mm' }, { label: '7.62x39mm (AK)', value: '7.62x39mm' }, 
-  { label: '5.45x39mm', value: '5.45x39mm' }, { label: '7.62x51mm NATO / .308 Win', value: '7.62x51mm' }, 
-  { label: '7.62x54mmR', value: '7.62x54mmR' }, { label: '6.5mm Creedmoor', value: '6.5mm Creedmoor' },
-  { label: '.300 Blackout', value: '.300 Blackout' }, { label: '.30-06 Springfield', value: '.30-06' },
-  { label: '.300 Winchester Magnum', value: '.300 Win Mag' }, { label: '.338 Lapua Magnum', value: '.338 Lapua' },
-  { label: '.50 BMG (12.7x99mm)', value: '.50 BMG' },
-  // Shotgun
-  { label: '12 Gauge', value: '12 Gauge' }, { label: '20 Gauge', value: '20 Gauge' }, { label: '16 Gauge', value: '16 Gauge' },
-  { label: '.410 Bore', value: '.410 Bore' },
-  { label: 'Друго', value: 'Друго' } 
-];
+// Replace CALIBER_DATA with this:
+const CALIBERS_BY_TYPE: Record<string, { label: string, value: string }[]> = {
+  'Пистолет': [
+    { label: '9x19mm Parabellum', value: '9x19mm' }, { label: '.45 ACP', value: '.45 ACP' }, 
+    { label: '.22 LR', value: '.22 LR' }, { label: '.380 ACP', value: '.380 ACP' }
+  ],
+  'Карабина': [
+    { label: '5.56x45mm NATO', value: '5.56x45mm' }, { label: '7.62x39mm (AK)', value: '7.62x39mm' },
+    { label: '7.62x51mm NATO', value: '7.62x51mm' }, { label: '.300 Blackout', value: '.300 Blackout' }
+  ],
+  'Ловна пушка (Гладкоцевна)': [
+    { label: '12 Gauge', value: '12 Gauge' }, { label: '20 Gauge', value: '20 Gauge' }
+  ],
+  'Болтова карабина': [
+    { label: '.308 Win', value: '.308 Win' }, { label: '6.5mm Creedmoor', value: '6.5mm Creedmoor' },
+    { label: '.338 Lapua', value: '.338 Lapua' }
+  ],
+  'Револвер': [
+    { label: '.357 Magnum', value: '.357 Magnum' }, { label: '.38 Special', value: '.38 Special' },
+    { label: '.44 Magnum', value: '.44 Magnum' }
+  ],
+  'Картечен пистолет (SMG)': [
+    { label: '9x19mm Parabellum', value: '9x19mm' }, { label: '.45 ACP', value: '.45 ACP' },
+    { label: '5.7x28mm (FN)', value: '5.7x28mm' }
+  ]
+};
 
 // Massive Smart Manufacturer Map (20+ each)
 const MFR_MAP: Record<string, { label: string, value: string }[]> = {
@@ -137,6 +144,16 @@ export default function AddGunScreen() {
 
   const handleSave = async () => {
     if (!name || !serial) return Alert.alert("Внимание", "Име и сериен номер са задължителни.");
+    
+    // --- WEIGHT VALIDATION ---
+    const weightNum = parseInt(weight);
+    if (weight && (isNaN(weightNum) || weightNum <= 0)) {
+      return Alert.alert("Внимание", "Теглото трябва да бъде положително число.");
+    }
+    if (type === 'Пистолет' && weightNum > 3000) return Alert.alert("Внимание", "Пистолет не може да тежи над 3 кг.");
+    if (type === 'Револвер' && weightNum > 3000) return Alert.alert("Внимание", "Револвер не може да тежи над 3 кг.");
+    if (weightNum > 15000) return Alert.alert("Внимание", "Въведеното тегло е нереалистично (над 15 кг).");
+
     setLoading(true);
     const { data: { user } } = await supabase.auth.getUser();
     let finalImageUrl = null;
@@ -155,18 +172,25 @@ export default function AddGunScreen() {
       } catch (err) { console.error(err); }
     }
 
+    const registrationDateIso = date.toISOString().split('T')[0];
+
     const { error } = await supabase.from('firearms').insert([{
       user_id: user?.id, name, serial_number: serial, manufacturer, type, caliber,
-      weight_grams: parseInt(weight) || null, barrel_length_mm: parseInt(barrelLength) || null,
-      capacity: parseInt(capacity) || null, kos_registration_date: date.toISOString().split('T')[0], image_url: finalImageUrl
+      weight_grams: weightNum || null, barrel_length_mm: parseInt(barrelLength) || null,
+      capacity: parseInt(capacity) || null, kos_registration_date: registrationDateIso, image_url: finalImageUrl
     }]);
 
     if (error) {
       Alert.alert("Грешка при запис", error.message);
     } else {
-      Alert.alert("Успешно!", "Оръжието е добавено.");
+      // --- SCHEDULE REAL KOS NOTIFICATION ---
+      // Calculate expiry date (+5 years)
+      const expiryDate = new Date(date);
+      expiryDate.setFullYear(expiryDate.getFullYear() + 5);
+      await scheduleKosRenewalNotification(name, expiryDate.toISOString().split('T')[0]);
+
+      Alert.alert("Успешно!", "Оръжието е добавено в арсенала.");
       
-      // THIS CLEARS THE FORM FOR THE NEXT ENTRY
       setName(''); setSerial(''); setWeight(''); setBarrelLength(''); setCapacity(''); 
       setImageObject(null); setDate(new Date()); setType('Пистолет'); setManufacturer('Glock'); setCaliber('9x19mm');
       
@@ -189,7 +213,7 @@ export default function AddGunScreen() {
       <Text style={[styles.label, { color: theme.accent }]}>Спецификации</Text>
       <Dropdown style={[styles.dropdown, { backgroundColor: theme.input, borderColor: theme.border }]} selectedTextStyle={{ color: activeTextColor }} placeholderStyle={{ color: theme.muted }} containerStyle={{ backgroundColor: theme.card, borderColor: theme.border }} itemTextStyle={{ color: activeTextColor }} activeColor={theme.border} data={TYPE_DATA} labelField="label" valueField="value" value={type} onChange={i => { setType(i.value); setManufacturer(MFR_MAP[i.value][0].value); }} />
       <Dropdown style={[styles.dropdown, { backgroundColor: theme.input, borderColor: theme.border }]} selectedTextStyle={{ color: activeTextColor }} placeholderStyle={{ color: theme.muted }} containerStyle={{ backgroundColor: theme.card, borderColor: theme.border }} itemTextStyle={{ color: activeTextColor }} activeColor={theme.border} data={MFR_MAP[type] || MFR_MAP['Пистолет']} labelField="label" valueField="value" value={manufacturer} onChange={i => setManufacturer(i.value)} />
-      <Dropdown style={[styles.dropdown, { backgroundColor: theme.input, borderColor: theme.border }]} selectedTextStyle={{ color: activeTextColor }} placeholderStyle={{ color: theme.muted }} containerStyle={{ backgroundColor: theme.card, borderColor: theme.border }} itemTextStyle={{ color: activeTextColor }} activeColor={theme.border} data={CALIBER_DATA} labelField="label" valueField="value" value={caliber} onChange={i => setCaliber(i.value)} />
+      <Dropdown style={[styles.dropdown, { backgroundColor: theme.input, borderColor: theme.border }]} selectedTextStyle={{ color: activeTextColor }} placeholderStyle={{ color: theme.muted }} containerStyle={{ backgroundColor: theme.card, borderColor: theme.border }} itemTextStyle={{ color: activeTextColor }} activeColor={theme.border} data={CALIBERS_BY_TYPE[type] || CALIBERS_BY_TYPE['Пистолет']} labelField="label" valueField="value" value={caliber} onChange={i => setCaliber(i.value)} />
 
       <View style={{ flexDirection: 'row', gap: 10, marginTop: 5 }}>
         <TextInput style={[styles.input, { flex: 1, backgroundColor: theme.input, borderColor: theme.border, color: activeTextColor }]} value={weight} onChangeText={setWeight} placeholder="Тегло (гр)" keyboardType="numeric" placeholderTextColor={theme.muted} />

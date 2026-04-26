@@ -1,21 +1,26 @@
 import React, { createContext, useState, useEffect, useContext } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-export type ThemeType = 'industrial' | 'girlypop' | 'light';
+export type ThemeType = 'industrial' | 'military' | 'girlypop' | 'light';
 
 export const THEMES = {
-  industrial: { 
-    bg: '#121212', card: '#1C1C1E', text: '#E0E0E0', muted: '#6B7280', 
-    accent: '#B71C1C', border: '#2A2A2A', input: '#151515' 
+  industrial: {
+    bg: '#121212', card: '#1C1C1E', text: '#E0E0E0', muted: '#6B7280',
+    accent: '#B71C1C', border: '#2A2A2A', input: '#151515',
   },
-  girlypop: { 
-    bg: '#FFE4E1', card: '#FFF0F5', text: '#D81B60', muted: '#F06292', 
-    accent: '#FF1493', border: '#FFB6C1', input: '#FFFFFF' 
+  // Military / camo theme for hunters, older users
+  military: {
+    bg: '#1B2015', card: '#252D1E', text: '#C8D4B0', muted: '#7A8A60',
+    accent: '#8A9A5B', border: '#3A4A2A', input: '#141A0F',
   },
-  light: { 
-    bg: '#F8F9FA', card: '#FFFFFF', text: '#111827', muted: '#6B7280', 
-    accent: '#111827', border: '#E5E7EB', input: '#F3F4F6' // Changed accent to Black/Dark Gray
-  }
+  girlypop: {
+    bg: '#FFE4E1', card: '#FFF0F5', text: '#D81B60', muted: '#F06292',
+    accent: '#FF1493', border: '#FFB6C1', input: '#FFFFFF',
+  },
+  light: {
+    bg: '#F8F9FA', card: '#FFFFFF', text: '#111827', muted: '#6B7280',
+    accent: '#111827', border: '#E5E7EB', input: '#F3F4F6',
+  },
 };
 
 const ThemeContext = createContext<any>(null);

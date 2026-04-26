@@ -1,20 +1,21 @@
 {
   "expo": {
-    "scheme": "kos-armory",
-    "name": "kos-armory-app",
+    "name": "КОС Арсенал",
     "slug": "kos-armory-app",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
+    "scheme": "kos-armory",
     "userInterfaceStyle": "dark",
-    "newArchEnabled": true,
+    "newArchEnabled": false,
     "splash": {
       "image": "./assets/splash-icon.png",
-      "resizeMode": "contain",
+      "resizeMode": "cover",
       "backgroundColor": "#0A0B0D"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": false,
+      "bundleIdentifier": "bg.kosarmory.app"
     },
     "android": {
       "adaptiveIcon": {
@@ -22,22 +23,26 @@
         "backgroundColor": "#0F1114"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false,
+      "predictiveBackGestureEnabled": true,
       "package": "bg.kosarmory.app"
     },
     "web": {
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
-      "expo-sqlite",
       "expo-router",
       "@react-native-community/datetimepicker",
-      "expo-font"
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#0A0B0D"
+        }
+      ]
     ],
     "extra": {
-      "router": {},
       "eas": {
-        "projectId": "2a581a11-22c1-4398-ab62-168249430e25"
+        "projectId": "31cd8a92-e1c0-48b2-beca-d59099dfaca3"
       }
     }
   }
