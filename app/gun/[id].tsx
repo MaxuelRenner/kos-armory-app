@@ -176,32 +176,45 @@ export default function GunDetailScreen() {
   };
 
   const handleTraining = async () => {
-    Alert.alert("Тренировка", "Стрелбата е отчетена. Ще получавате известия за почистване през следващите 5 часа.");
-    
-    const newCount = (gun.training_count || 0) + 1;
-    
-    // 1. OPTIMISTIC UPDATE
-    setGun((prev: any) => ({ ...prev, training_count: newCount }));
+    const now = new Date().toISOString();
 
-    // 2. Database Update
-    const { error } = await supabase.from('firearms').update({ 
-      needs_cleaning: true, 
-      last_range_day: new Date().toISOString(), 
-      training_count: newCount 
-    }).eq('id', id);
+    // 1. Instantly update UI
+    setGun((prev: any) => {
+      if (!prev) return prev;
+      return { ...prev, training_count: (prev.training_count || 0) + 1, needs_cleaning: true, last_range_day: now };
+    });
 
-    // 3. ERROR CATCHER (If you forgot to add the column in Supabase!)
-    if (error) {
-      Alert.alert("Грешка в Базата Данни", "Броячът не се запази! Уверете се че сте добавили колона 'training_count' (int4) в Supabase таблицата 'firearms'.\n\nДетайли: " + error.message);
-      setGun((prev: any) => ({ ...prev, training_count: newCount - 1 })); // Reverts the fake visual update
-      return;
+    // 2. Show the missing visual confirmation
+    Alert.alert("Тренировката е записана!", "Не забравяйте да почистите оръжието си след стрелба.");
+
+    // 3. Schedule an actual background Push Notification for 1 hour from now
+    try {
+      await Notifications.scheduleNotificationAsync({
+        content: {
+          title: "🔫 Време за почистване!",
+          body: `Оръжието ви има нужда от почистване след днешната тренировка.`,
+          sound: true,
+        },
+        // 👈 FIXED: Expo strictly requires the 'type' property now!
+        trigger: { 
+          type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+          seconds: 3600, 
+          repeats: false 
+        }, 
+        identifier: `clean_${id}`
+      });
+    } catch (e) { 
+      console.error(e); 
     }
-    
-    // 4. Setup cleaning notification loop
-    await scheduleCleaningReminders(gun.name);
-    fetchGunDetails();
-  };
 
+    // 4. Update Supabase silently in background
+    supabase.from('firearms').update({
+      training_count: (gun?.training_count || 0) + 1,
+      needs_cleaning: true,
+      last_range_day: now,
+    }).eq('id', id).then();
+  };
+  
   const handleDelete = async () => {
     Alert.alert(
       "Премахване на оръжие",
@@ -233,19 +246,30 @@ export default function GunDetailScreen() {
     );
   };
 
-  const handleClean = async () => { 
-    Alert.alert("Готово", "Оръжието е почистено!");
-    
-    // 👇 FIXED: Changed 'last_cleaned' to 'last_cleaned_date' to match your database!
-    await supabase.from('firearms').update({ needs_cleaning: false, last_cleaned_date: new Date().toISOString() }).eq('id', id);
-  
-  try {
-    await Notifications.cancelAllScheduledNotificationsAsync(); 
-  } catch(e) {} // Ignores Expo Go error
+const handleClean = async () => {
+    const now = new Date().toISOString();
 
-    fetchGunDetails();
+    // 1. Instantly update UI
+    setGun((prev: any) => {
+      if (!prev) return prev;
+      return { ...prev, needs_cleaning: false, last_cleaned_date: now };
+    });
+
+    // 2. Show visual confirmation
+    Alert.alert("Почистено!", "Оръжието е отбелязано като почистено и поддържано.");
+
+    // 3. Cancel the push notification since you already cleaned it!
+    try {
+      await Notifications.cancelScheduledNotificationAsync(`clean_${id}`);
+    } catch(e) {}
+
+    // 4. Update Supabase silently
+    supabase.from('firearms').update({
+      needs_cleaning: false,
+      last_cleaned_date: now,
+    }).eq('id', id).then();
   };
-
+  
   if (loading) return <View style={[styles.container, { backgroundColor: theme.bg, justifyContent: 'center' }]}><ActivityIndicator color={theme.accent} /></View>;
   if (!gun) return <View style={[styles.container, { backgroundColor: theme.bg }]}><Text style={{ color: theme.text, textAlign: 'center', marginTop: 40 }}>Оръжието не е намерено.</Text></View>;
 

@@ -1,326 +1,349 @@
 import React, { useState, useCallback, useRef } from 'react';
-import { View, Text, TextInput, ScrollView, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, Platform, Image } from 'react-native';
+import { 
+  View, Text, TextInput, ScrollView, TouchableOpacity, 
+  StyleSheet, Alert, ActivityIndicator, Image
+} from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { useFocusEffect } from '@react-navigation/native';
-import DateTimePicker from '@react-native-community/datetimepicker';
-import { Dropdown } from 'react-native-element-dropdown';
-import * as ImagePicker from 'expo-image-picker';
-import { decode } from 'base64-arraybuffer'; // THIS FIXED THE ERROR SCREEN!
-import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native'; 
+import * as ImagePicker from 'expo-image-picker'; 
 import { supabase } from '../../constants/supabase';
+import { Spacing, Radius } from '../../constants/theme';
 import { useTheme } from '../../context/ThemeContext';
-import { scheduleKosRenewalNotification } from '../../constants/notifications';
+import { Dropdown } from 'react-native-element-dropdown';
 
-// ─── MASSIVE DATABASES ────────────────────────────────────────────────────────
-
-const TYPE_DATA = [ 
-  { label: 'Пистолет', value: 'Пистолет' }, 
-  { label: 'Картечен пистолет (SMG)', value: 'SMG' }, 
-  { label: 'Карабина (Полуавтомат)', value: 'Карабина' }, 
-  { label: 'Ловна пушка (Гладкоцевна)', value: 'Гладкоцевна' },
+const TYPE_DATA = [
+  { label: 'Пистолет', value: 'Пистолет' },
+  { label: 'Револвер', value: 'Револвер' },
+  { label: 'SMG', value: 'SMG' },
+  { label: 'Карабина', value: 'Карабина' },
   { label: 'Болтова карабина', value: 'Болтова' },
-  { label: 'Револвер', value: 'Револвер' }
+  { label: 'Ловна пушка (Гладкоцевна)', value: 'Гладкоцевна' }
 ];
+
+const MFR_MAP: Record<string, { label: string, value: string }[]> = {
+  'Пистолет': [
+    { label: 'Glock', value: 'Glock' }, { label: 'Sig Sauer', value: 'Sig Sauer' }, { label: 'CZ', value: 'CZ' }, 
+    { label: 'Heckler & Koch (H&K)', value: 'H&K' }, { label: 'Beretta', value: 'Beretta' }, 
+    { label: 'Smith & Wesson', value: 'S&W' }, { label: 'Springfield Armory', value: 'Springfield' }, 
+    { label: 'Walther', value: 'Walther' }, { label: 'Ruger', value: 'Ruger' }, { label: 'FN Herstal', value: 'FN' }, 
+    { label: 'Taurus', value: 'Taurus' }, { label: 'Arsenal', value: 'Arsenal' }, { label: 'Makarov', value: 'Makarov' }, 
+    { label: 'Colt', value: 'Colt' }, { label: 'Canik', value: 'Canik' }, { label: 'Steyr', value: 'Steyr' }, 
+    { label: 'Zastava', value: 'Zastava' }, { label: 'Tisas', value: 'Tisas' }, { label: 'Grand Power', value: 'Grand Power' }, 
+    { label: 'HS Produkt', value: 'HS Produkt' }, { label: 'Друго', value: 'Друго' }
+  ],
+  'Револвер': [
+    { label: 'Smith & Wesson', value: 'S&W' }, { label: 'Colt', value: 'Colt' }, { label: 'Ruger', value: 'Ruger' }, 
+    { label: 'Taurus', value: 'Taurus' }, { label: 'Chiappa', value: 'Chiappa' }, { label: 'Charter Arms', value: 'Charter Arms' }, 
+    { label: 'Manurhin', value: 'Manurhin' }, { label: 'Uberti', value: 'Uberti' }, { label: 'Alfa Proj', value: 'Alfa Proj' }, 
+    { label: 'Друго', value: 'Друго' }
+  ],
+  'SMG': [
+    { label: 'Heckler & Koch (H&K)', value: 'H&K' }, { label: 'FN Herstal', value: 'FN' }, { label: 'CZ', value: 'CZ' }, 
+    { label: 'B&T', value: 'B&T' }, { label: 'Sig Sauer', value: 'Sig Sauer' }, { label: 'IWI', value: 'IWI' }, 
+    { label: 'Arsenal', value: 'Arsenal' }, { label: 'CMMG', value: 'CMMG' }, { label: 'Kel-Tec', value: 'Kel-Tec' }, 
+    { label: 'Kriss USA', value: 'Kriss' }, { label: 'Grand Power', value: 'Grand Power' }, { label: 'Друго', value: 'Друго' }
+  ],
+  'Карабина': [
+    { label: 'Arsenal', value: 'Arsenal' }, { label: 'Colt', value: 'Colt' }, { label: 'Daniel Defense', value: 'Daniel Defense' }, 
+    { label: 'BCM', value: 'BCM' }, { label: 'Aero Precision', value: 'Aero Precision' }, { label: 'Heckler & Koch (H&K)', value: 'H&K' }, 
+    { label: 'FN Herstal', value: 'FN' }, { label: 'Sig Sauer', value: 'Sig Sauer' }, { label: 'IWI', value: 'IWI' }, 
+    { label: 'CZ', value: 'CZ' }, { label: 'Ruger', value: 'Ruger' }, { label: 'Smith & Wesson', value: 'S&W' }, 
+    { label: 'Steyr', value: 'Steyr' }, { label: 'Zastava', value: 'Zastava' }, { label: 'CMMG', value: 'CMMG' }, 
+    { label: 'Radian', value: 'Radian' }, { label: 'KAC', value: 'KAC' }, { label: 'LMT', value: 'LMT' }, 
+    { label: 'Noveske', value: 'Noveske' }, { label: 'Друго', value: 'Друго' }
+  ],
+  'Болтова': [
+    { label: 'Remington', value: 'Remington' }, { label: 'Sako', value: 'Sako' }, { label: 'Tikka', value: 'Tikka' }, 
+    { label: 'Bergara', value: 'Bergara' }, { label: 'Browning', value: 'Browning' }, { label: 'Winchester', value: 'Winchester' }, 
+    { label: 'Ruger', value: 'Ruger' }, { label: 'Savage', value: 'Savage' }, { label: 'CZ', value: 'CZ' }, 
+    { label: 'Steyr', value: 'Steyr' }, { label: 'Mauser', value: 'Mauser' }, { label: 'Howa', value: 'Howa' }, 
+    { label: 'Weatherby', value: 'Weatherby' }, { label: 'Accuracy International', value: 'Accuracy International' }, 
+    { label: 'Blaser', value: 'Blaser' }, { label: 'Друго', value: 'Друго' }
+  ],
+  'Гладкоцевна': [
+    { label: 'Benelli', value: 'Benelli' }, { label: 'Beretta', value: 'Beretta' }, { label: 'Mossberg', value: 'Mossberg' }, 
+    { label: 'Remington', value: 'Remington' }, { label: 'Browning', value: 'Browning' }, { label: 'Winchester', value: 'Winchester' }, 
+    { label: 'Stoeger', value: 'Stoeger' }, { label: 'Franchi', value: 'Franchi' }, { label: 'Kel-Tec', value: 'Kel-Tec' }, 
+    { label: 'Hatsan', value: 'Hatsan' }, { label: 'Baikal', value: 'Baikal' }, { label: 'CZ', value: 'CZ' }, 
+    { label: 'Fabarm', value: 'Fabarm' }, { label: 'Друго', value: 'Друго' }
+  ]
+};
 
 const CALIBERS_BY_TYPE: Record<string, { label: string, value: string }[]> = {
   'Пистолет': [
-    { label: '9x19mm Parabellum', value: '9x19mm' }, { label: '9x18mm Makarov', value: '9x18mm Makarov' },
-    { label: '.45 ACP', value: '.45 ACP' }, { label: '.380 ACP', value: '.380 ACP' },
-    { label: '10mm Auto', value: '10mm Auto' }, { label: '.22 LR', value: '.22 LR' },
+    { label: '.22 LR', value: '.22 LR' }, { label: '.25 ACP', value: '.25 ACP' }, { label: '.32 ACP', value: '.32 ACP' }, 
+    { label: '.380 ACP', value: '.380 ACP' }, { label: '9x18mm Makarov', value: '9x18mm Makarov' }, 
+    { label: '9x19mm Parabellum', value: '9x19mm' }, { label: '.357 SIG', value: '.357 SIG' }, { label: '.40 S&W', value: '.40 S&W' }, 
+    { label: '10mm Auto', value: '10mm Auto' }, { label: '.45 ACP', value: '.45 ACP' }, { label: '5.7x28mm', value: '5.7x28mm' }, 
     { label: '7.62x25mm Tokarev', value: '7.62x25mm' }, { label: 'Друго', value: 'Друго' }
   ],
   'Револвер': [
-    { label: '.357 Magnum', value: '.357 Magnum' }, { label: '.38 Special', value: '.38 Special' },
-    { label: '.44 Magnum', value: '.44 Magnum' }, { label: '.22 LR', value: '.22 LR' }, { label: 'Друго', value: 'Друго' }
+    { label: '.22 LR', value: '.22 LR' }, { label: '.22 WMR', value: '.22 WMR' }, { label: '.38 Special', value: '.38 Special' }, 
+    { label: '.357 Magnum', value: '.357 Magnum' }, { label: '.44 Special', value: '.44 Special' }, 
+    { label: '.44 Magnum', value: '.44 Magnum' }, { label: '.45 Colt', value: '.45 Colt' }, { label: '.454 Casull', value: '.454 Casull' }, 
+    { label: '.460 S&W', value: '.460 S&W' }, { label: '.500 S&W', value: '.500 S&W' }, { label: 'Друго', value: 'Друго' }
   ],
   'SMG': [
-    { label: '9x19mm Parabellum', value: '9x19mm' }, { label: '.45 ACP', value: '.45 ACP' },
-    { label: '5.7x28mm (FN)', value: '5.7x28mm' }, { label: 'Друго', value: 'Друго' }
+    { label: '9x19mm Parabellum', value: '9x19mm' }, { label: '.45 ACP', value: '.45 ACP' }, { label: '10mm Auto', value: '10mm Auto' }, 
+    { label: '5.7x28mm', value: '5.7x28mm' }, { label: '4.6x30mm', value: '4.6x30mm' }, { label: '9x18mm Makarov', value: '9x18mm Makarov' }, 
+    { label: 'Друго', value: 'Друго' }
   ],
   'Карабина': [
-    { label: '5.56x45mm NATO / .223', value: '5.56x45mm' }, { label: '7.62x39mm (AK)', value: '7.62x39mm' },
-    { label: '7.62x51mm NATO / .308', value: '7.62x51mm' }, { label: '5.45x39mm', value: '5.45x39mm' },
-    { label: '.300 Blackout', value: '.300 Blackout' }, { label: 'Друго', value: 'Друго' }
+    { label: '.22 LR', value: '.22 LR' }, { label: '5.56x45mm NATO / .223 Rem', value: '5.56x45mm' }, 
+    { label: '7.62x39mm', value: '7.62x39mm' }, { label: '5.45x39mm', value: '5.45x39mm' }, { label: '.300 Blackout', value: '.300 Blackout' }, 
+    { label: '7.62x51mm NATO / .308 Win', value: '7.62x51mm' }, { label: '6.5mm Grendel', value: '6.5mm Grendel' }, 
+    { label: '6.8 SPC', value: '6.8 SPC' }, { label: '9x19mm (PCC)', value: '9x19mm' }, { label: '.45 ACP (PCC)', value: '.45 ACP' }, 
+    { label: '10mm Auto (PCC)', value: '10mm Auto' }, { label: 'Друго', value: 'Друго' }
   ],
   'Болтова': [
-    { label: '.308 Winchester', value: '.308 Win' }, { label: '6.5mm Creedmoor', value: '6.5mm Creedmoor' },
-    { label: '.30-06 Springfield', value: '.30-06' }, { label: '.300 Win Mag', value: '.300 Win Mag' },
-    { label: '.338 Lapua Magnum', value: '.338 Lapua' }, { label: '7.62x54mmR', value: '7.62x54mmR' },
+    { label: '.22 LR', value: '.22 LR' }, { label: '.223 Rem', value: '.223 Rem' }, { label: '.243 Win', value: '.243 Win' }, 
+    { label: '6.5mm Creedmoor', value: '6.5mm Creedmoor' }, { label: '6.5x55mm Swedish', value: '6.5x55mm' }, 
+    { label: '.270 Win', value: '.270 Win' }, { label: '7mm-08 Rem', value: '7mm-08' }, { label: '7mm Rem Mag', value: '7mm Rem Mag' }, 
+    { label: '.308 Win', value: '.308 Win' }, { label: '.30-06 Springfield', value: '.30-06' }, { label: '.300 Win Mag', value: '.300 Win Mag' }, 
+    { label: '.300 PRC', value: '.300 PRC' }, { label: '.338 Lapua Magnum', value: '.338 Lapua' }, { label: '7.62x54mmR', value: '7.62x54mmR' }, 
     { label: 'Друго', value: 'Друго' }
   ],
   'Гладкоцевна': [
-    { label: '12 Gauge', value: '12 Gauge' }, { label: '16 Gauge', value: '16 Gauge' },
-    { label: '20 Gauge', value: '20 Gauge' }, { label: '.410 Bore', value: '.410 Bore' },
-    { label: 'Друго', value: 'Друго' }
+    { label: '12 Gauge', value: '12 Gauge' }, { label: '16 Gauge', value: '16 Gauge' }, { label: '20 Gauge', value: '20 Gauge' }, 
+    { label: '28 Gauge', value: '28 Gauge' }, { label: '.410 Bore', value: '.410 Bore' }, { label: 'Друго', value: 'Друго' }
   ]
 };
 
-// Massive Smart Manufacturer Map (20+ each)
-const MFR_MAP: Record<string, { label: string, value: string }[]> = {
-  'Пистолет': [
-    { label: 'Glock', value: 'Glock' }, { label: 'Sig Sauer', value: 'Sig Sauer' }, 
-    { label: 'CZ', value: 'CZ' }, { label: 'Heckler & Koch (H&K)', value: 'H&K' }, 
-    { label: 'Beretta', value: 'Beretta' }, { label: 'Smith & Wesson', value: 'Smith & Wesson' }, 
-    { label: 'Walther', value: 'Walther' }, { label: 'FN Herstal', value: 'FN Herstal' }, 
-    { label: 'Springfield Armory', value: 'Springfield Armory' }, { label: 'Ruger', value: 'Ruger' }, 
-    { label: 'Canik', value: 'Canik' }, { label: 'Taurus', value: 'Taurus' }, 
-    { label: 'Arex', value: 'Arex' }, { label: 'HS Produkt', value: 'HS Produkt' }, 
-    { label: 'Steyr Arms', value: 'Steyr Arms' }, { label: 'IWI', value: 'IWI' }, 
-    { label: 'Grand Power', value: 'Grand Power' }, { label: 'Kel-Tec', value: 'Kel-Tec' }, 
-    { label: 'Makarov / Arsenal', value: 'Arsenal' }, { label: 'Zastava Arms', value: 'Zastava Arms' }, 
-    { label: 'Друго', value: 'Друго' }
-  ],
-  'Револвер': [
-    { label: 'Smith & Wesson', value: 'Smith & Wesson' }, { label: 'Colt', value: 'Colt' }, 
-    { label: 'Ruger', value: 'Ruger' }, { label: 'Taurus', value: 'Taurus' }, 
-    { label: 'Kimber', value: 'Kimber' }, { label: 'Korth', value: 'Korth' }, 
-    { label: 'Manurhin', value: 'Manurhin' }, { label: 'Charter Arms', value: 'Charter Arms' }, 
-    { label: 'Chiappa Firearms', value: 'Chiappa' }, { label: 'North American Arms (NAA)', value: 'NAA' }, 
-    { label: 'Uberti', value: 'Uberti' }, { label: 'Pietta', value: 'Pietta' }, 
-    { label: 'Dan Wesson', value: 'Dan Wesson' }, { label: 'Spohr', value: 'Spohr' }, 
-    { label: 'Друго', value: 'Друго' }
-  ],
-  'SMG': [ 
-    { label: 'Heckler & Koch (H&K)', value: 'H&K' }, { label: 'CZ (Scorpion)', value: 'CZ' }, 
-    { label: 'Sig Sauer (MPX)', value: 'Sig Sauer' }, { label: 'B&T (APC)', value: 'B&T' }, 
-    { label: 'FN Herstal (P90)', value: 'FN Herstal' }, { label: 'Arsenal', value: 'Arsenal' }, 
-    { label: 'IWI (Uzi)', value: 'IWI' }, { label: 'Grand Power (Stribog)', value: 'Grand Power' }, 
-    { label: 'Kel-Tec', value: 'Kel-Tec' }, { label: 'Sten', value: 'Sten' },
-    { label: 'Друго', value: 'Друго' } 
-  ],
-  'Карабина': [
-    { label: 'Arsenal (AK-47 BG)', value: 'Arsenal' }, { label: 'Colt', value: 'Colt' }, 
-    { label: 'Daniel Defense', value: 'Daniel Defense' }, { label: 'Sig Sauer', value: 'Sig Sauer' }, 
-    { label: 'Heckler & Koch (H&K)', value: 'H&K' }, { label: 'FN Herstal', value: 'FN Herstal' }, 
-    { label: 'Ruger', value: 'Ruger' }, { label: 'Smith & Wesson', value: 'Smith & Wesson' }, 
-    { label: 'Springfield Armory', value: 'Springfield Armory' }, { label: 'IWI', value: 'IWI' }, 
-    { label: 'CZ', value: 'CZ' }, { label: 'Steyr Arms (AUG)', value: 'Steyr Arms' }, 
-    { label: 'BCM', value: 'BCM' }, { label: 'Aero Precision', value: 'Aero Precision' }, 
-    { label: "Knight's Armament (KAC)", value: 'KAC' }, { label: 'Zastava Arms', value: 'Zastava Arms' }, 
-    { label: 'Друго', value: 'Друго' }
-  ],
-  'Болтова': [
-    { label: 'Tikka', value: 'Tikka' }, { label: 'Sako', value: 'Sako' }, 
-    { label: 'Remington', value: 'Remington' }, { label: 'Ruger', value: 'Ruger' }, 
-    { label: 'Browning', value: 'Browning' }, { label: 'Blaser', value: 'Blaser' }, 
-    { label: 'Bergara', value: 'Bergara' }, { label: 'CZ', value: 'CZ' }, 
-    { label: 'Savage Arms', value: 'Savage Arms' }, { label: 'Steyr Mannlicher', value: 'Steyr Mannlicher' }, 
-    { label: 'Mauser', value: 'Mauser' }, { label: 'Winchester', value: 'Winchester' }, 
-    { label: 'Sauer', value: 'Sauer' }, { label: 'Howa', value: 'Howa' }, 
-    { label: 'Haenel', value: 'Haenel' }, { label: 'Barrett', value: 'Barrett' }, 
-    { label: 'Accuracy International', value: 'Accuracy International' }, { label: 'Merkel', value: 'Merkel' }, 
-    { label: 'Друго', value: 'Друго' }
-  ],
-  'Гладкоцевна': [
-    { label: 'Benelli', value: 'Benelli' }, { label: 'Beretta', value: 'Beretta' }, 
-    { label: 'Mossberg', value: 'Mossberg' }, { label: 'Remington', value: 'Remington' }, 
-    { label: 'Browning', value: 'Browning' }, { label: 'Franchi', value: 'Franchi' }, 
-    { label: 'Winchester', value: 'Winchester' }, { label: 'Stoeger', value: 'Stoeger' }, 
-    { label: 'ATA Arms', value: 'ATA Arms' }, { label: 'Huglu', value: 'Huglu' }, 
-    { label: 'CZ', value: 'CZ' }, { label: 'Fabarm', value: 'Fabarm' }, 
-    { label: 'Hatsan', value: 'Hatsan' }, { label: 'Akkar', value: 'Akkar' }, 
-    { label: 'Kel-Tec (KSG)', value: 'Kel-Tec' }, { label: 'Baikal (IZH)', value: 'Baikal' }, 
-    { label: 'Perazzi', value: 'Perazzi' }, { label: 'Krieghoff', value: 'Krieghoff' }, 
-    { label: 'Derya Arms', value: 'Derya Arms' }, { label: 'Blaser', value: 'Blaser' }, 
-    { label: 'Друго', value: 'Друго' }
-  ]
+// 👈 NEW: Smart Filter Logic
+const getAvailableCalibers = (currentType: string, currentMfr: string) => {
+  if (currentType === 'Пистолет') {
+    if (currentMfr === 'Makarov') return [{ label: '9x18mm Makarov', value: '9x18mm Makarov' }, { label: '.380 ACP', value: '.380 ACP' }, { label: 'Друго', value: 'Друго' }];
+    if (currentMfr === 'Arsenal') return [{ label: '9x18mm Makarov', value: '9x18mm Makarov' }, { label: '9x19mm Parabellum', value: '9x19mm' }, { label: 'Друго', value: 'Друго' }];
+    if (currentMfr === 'Glock') return [{ label: '9x19mm Parabellum', value: '9x19mm' }, { label: '.40 S&W', value: '.40 S&W' }, { label: '.45 ACP', value: '.45 ACP' }, { label: '10mm Auto', value: '10mm Auto' }, { label: '.380 ACP', value: '.380 ACP' }, { label: '.22 LR', value: '.22 LR' }, { label: 'Друго', value: 'Друго' }];
+    if (currentMfr === 'Beretta' || currentMfr === 'CZ' || currentMfr === 'Sig Sauer' || currentMfr === 'Walther') return [{ label: '9x19mm Parabellum', value: '9x19mm' }, { label: '.380 ACP', value: '.380 ACP' }, { label: '.40 S&W', value: '.40 S&W' }, { label: '.45 ACP', value: '.45 ACP' }, { label: '.22 LR', value: '.22 LR' }, { label: 'Друго', value: 'Друго' }];
+  }
+  if (currentType === 'Карабина') {
+    if (currentMfr === 'Arsenal' || currentMfr === 'Zastava') return [{ label: '7.62x39mm', value: '7.62x39mm' }, { label: '5.56x45mm NATO', value: '5.56x45mm' }, { label: '5.45x39mm', value: '5.45x39mm' }, { label: 'Друго', value: 'Друго' }];
+    if (currentMfr === 'Colt' || currentMfr === 'Daniel Defense' || currentMfr === 'BCM' || currentMfr === 'Aero Precision') return [{ label: '5.56x45mm NATO / .223 Rem', value: '5.56x45mm' }, { label: '.300 Blackout', value: '.300 Blackout' }, { label: 'Друго', value: 'Друго' }];
+  }
+  
+  // If we don't have a specific rule for the manufacturer, return the full list for that weapon type
+  return CALIBERS_BY_TYPE[currentType] || CALIBERS_BY_TYPE['Пистолет'];
 };
+
 export default function AddGunScreen() {
   const router = useRouter();
-  const { theme, themeName } = useTheme();
-  const [loading, setLoading] = useState(false);
-  
+  const { theme } = useTheme();
+  const insets = useSafeAreaInsets(); 
+
   const [name, setName] = useState('');
   const [serial, setSerial] = useState('');
+  const [weight, setWeight] = useState('');
+  const [capacity, setCapacity] = useState(''); // 👈 FIXED: Memory added!
+  const [loading, setLoading] = useState(false);
+  const [imageObject, setImageObject] = useState<ImagePicker.ImagePickerAsset | null>(null);
+  const [imageSelectorPressed, setImageSelectorPressed] = useState(false); 
+
   const [type, setType] = useState('Пистолет');
   const [manufacturer, setManufacturer] = useState('Glock');
   const [caliber, setCaliber] = useState('9x19mm');
-  const [weight, setWeight] = useState('');
-  const [barrelLength, setBarrelLength] = useState('');
-  const [capacity, setCapacity] = useState('');
-  const [date, setDate] = useState(new Date());
-  const [showPicker, setShowPicker] = useState(false);
-  const [imageObject, setImageObject] = useState<ImagePicker.ImagePickerAsset | null>(null);
+  const availableCalibers = getAvailableCalibers(type, manufacturer);
 
-  // Track if we are currently using the camera/gallery so the app doesn't wipe the form
   const isPickingImage = useRef(false);
 
-  // 👈 FIXED: Wipe the form cleanly whenever the user leaves the screen!
   useFocusEffect(
     useCallback(() => {
-      // This runs when screen loses focus (user navigates away)
       return () => {
         if (!isPickingImage.current) {
-          setName(''); setSerial(''); setWeight(''); setBarrelLength(''); setCapacity('');
-          setImageObject(null); setDate(new Date()); setType('Пистолет'); setManufacturer('Glock'); setCaliber('9x19mm');
+          setName(''); setSerial(''); setWeight(''); setCapacity(''); 
+          setImageObject(null); setType('Пистолет'); setManufacturer('Glock'); setCaliber('9x19mm');
         }
       };
     }, [])
   );
 
-  const pickImage = async () => {
-    isPickingImage.current = true; // Lock the wipe flag!
+  const handleImageSelection = () => {
+    Alert.alert("Добавяне на снимка", "Изберете източник на снимката:", [
+      { text: "Камера", onPress: launchCamera },
+      { text: "Галерия", onPress: launchGallery },
+      { text: "Отказ", style: "cancel" }
+    ]);
+  };
 
-    let result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images, allowsEditing: true, aspect: [4, 3], quality: 0.5,
-    });
-
-    if (!result.canceled && result.assets && result.assets.length > 0) {
-      setImageObject(result.assets[0]);
+  const launchCamera = async () => {
+    isPickingImage.current = true; 
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert("Грешка", "Необходим е достъп до камерата за тази функция.");
+      setTimeout(() => { isPickingImage.current = false; }, 500);
+      return;
     }
+    try {
+      let result = await ImagePicker.launchCameraAsync({ allowsEditing: true, aspect: [4, 3], quality: 0.5 });
+      if (!result.canceled && result.assets && result.assets.length > 0) setImageObject(result.assets[0]);
+    } catch (error: any) {
+      Alert.alert("Грешка при камерата", error.message || "Неуспешен старт на камерата.");
+    } finally {
+      setTimeout(() => { isPickingImage.current = false; }, 500);
+    }
+  };
 
-    // Unlock the wipe flag after a small delay to ensure the OS has fully returned to the app
-    setTimeout(() => { isPickingImage.current = false; }, 500);
+  const launchGallery = async () => {
+    isPickingImage.current = true; 
+    try {
+      let result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, allowsEditing: true, aspect: [4, 3], quality: 0.5 });
+      if (!result.canceled && result.assets && result.assets.length > 0) setImageObject(result.assets[0]);
+    } catch (error: any) {
+      Alert.alert("Грешка при галерията", error.message || "Неуспешен достъп до галерията.");
+    } finally {
+      setTimeout(() => { isPickingImage.current = false; }, 500);
+    }
   };
 
   const handleSave = async () => {
     if (!name || !serial) return Alert.alert("Внимание", "Име и сериен номер са задължителни.");
     
-    // --- SMART WEIGHT VALIDATION ---
     const weightNum = parseInt(weight);
-    if (weight) {
-      if (isNaN(weightNum) || weightNum <= 0) {
-        return Alert.alert("Внимание", "Теглото трябва да бъде положително число.");
-      }
-
-      // 1. Задаваме границите според избрания тип
-      let minWeight = 100;
-      let maxWeight = 15000;
-
-      if (type === 'Пистолет' || type === 'Револвер') { minWeight = 100; maxWeight = 3000; }
-      else if (type === 'SMG') { minWeight = 1000; maxWeight = 5000; }
-      else if (type === 'Карабина') { minWeight = 1500; maxWeight = 8000; }
-      else if (type === 'Гладкоцевна') { minWeight = 2000; maxWeight = 6000; }
-      else if (type === 'Болтова') { minWeight = 2000; maxWeight = 12000; }
-
-      // 2. Проверяваме дали въведеното тегло е извън тези граници
-      if (weightNum < minWeight || weightNum > maxWeight) {
-        return Alert.alert(
-          "Невалидно тегло", 
-          `За тип "${type}" теглото трябва да бъде между ${minWeight} гр. и ${maxWeight} гр.`
-        );
-      }
-    }
+    const capacityNum = parseInt(capacity);
 
     setLoading(true);
-    const { data: { user } } = await supabase.auth.getUser();
-    let finalImageUrl = null;
+    let publicUrl = null;
 
-    if (imageObject && imageObject.uri) {
-      try {
-        const fileExt = imageObject.uri.substring(imageObject.uri.lastIndexOf('.') + 1);
-        const fileName = `gun_${Date.now()}.${fileExt}`;
-        const formData = new FormData();
-        formData.append('file', { uri: imageObject.uri, name: fileName, type: `image/${fileExt === 'jpg' ? 'jpeg' : fileExt}` } as any);
-        const { error: uploadError } = await supabase.storage.from('gun-images').upload(fileName, formData);
-        if (!uploadError) {
-          const { data: publicUrlData } = supabase.storage.from('gun-images').getPublicUrl(fileName);
-          finalImageUrl = publicUrlData.publicUrl;
-        }
-      } catch (err) { console.error(err); }
+    if (imageObject) {
+      const { uri } = imageObject;
+      const fileExt = uri.substring(uri.lastIndexOf('.') + 1);
+      const fileName = `gun_${Date.now()}.${fileExt}`;
+      const formData = new FormData();
+      formData.append('file', { uri, name: fileName, type: `image/${fileExt === 'jpg' ? 'jpeg' : fileExt}` } as any);
+      
+      const { error: uploadError } = await supabase.storage.from('gun-images').upload(fileName, formData);
+      if (!uploadError) {
+        const { data: publicUrlData } = supabase.storage.from('gun-images').getPublicUrl(fileName);
+        publicUrl = publicUrlData.publicUrl;
+      } else {
+        setLoading(false); return Alert.alert("Грешка при снимката", uploadError.message);
+      }
     }
 
-    const registrationDateIso = date.toISOString().split('T')[0];
-
+    const todayStr = new Date().toISOString().split('T')[0];
     const { error } = await supabase.from('firearms').insert([{
-      user_id: user?.id, name, serial_number: serial, manufacturer, type, caliber,
-      weight_grams: weightNum || null, barrel_length_mm: parseInt(barrelLength) || null,
-      capacity: parseInt(capacity) || null, kos_registration_date: registrationDateIso, image_url: finalImageUrl
+      user_id: (await supabase.auth.getUser()).data.user?.id,
+      name, serial_number: serial, type, manufacturer, caliber, 
+      weight_grams: isNaN(weightNum) ? null : weightNum, 
+      capacity: isNaN(capacityNum) ? null : capacityNum,
+      image_url: publicUrl,
+      kos_registration_date: todayStr, 
+      last_cleaned_date: new Date().toISOString() 
     }]);
 
-    if (error) {
-      Alert.alert("Грешка при запис", error.message);
-    } else {
-      // --- SCHEDULE REAL KOS NOTIFICATION ---
-      // Calculate expiry date (+5 years)
-      const expiryDate = new Date(date);
-      expiryDate.setFullYear(expiryDate.getFullYear() + 5);
-      await scheduleKosRenewalNotification(name, expiryDate.toISOString().split('T')[0]);
-
-      Alert.alert("Успешно!", "Оръжието е добавено в арсенала.");
-      
-      setName(''); setSerial(''); setWeight(''); setBarrelLength(''); setCapacity(''); 
-      setImageObject(null); setDate(new Date()); setType('Пистолет'); setManufacturer('Glock'); setCaliber('9x19mm');
-      
-      router.replace('/(tabs)');
-    }
+    if (error) { Alert.alert("Грешка", error.message); } 
+    else { Alert.alert("Успешно!", "Оръжието е добавено в Арсенала."); router.replace('/(tabs)'); }
     setLoading(false);
   };
 
-  // This turns the text RED if Industrial is active, otherwise normal text color
-  const activeTextColor = themeName === 'industrial' ? theme.accent : theme.text;
-
   return (
-    <ScrollView style={[styles.container, { backgroundColor: theme.bg }]} contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-      <Text style={[styles.title, { color: theme.text }]}>Добави в арсенала</Text>
+    <View style={[styles.container, { backgroundColor: theme.bg, paddingTop: insets.top + 20 }]}>
+      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+        <Text style={[styles.title, { color: theme.text }]}>НОВО ОРЪЖИЕ</Text>
 
-      <Text style={[styles.label, { color: theme.accent }]}>Модел & Сериен номер</Text>
-      <TextInput style={[styles.input, { backgroundColor: theme.input, borderColor: theme.border, color: activeTextColor }]} value={name} onChangeText={setName} placeholder="Модел..." placeholderTextColor={theme.muted} />
-      <TextInput style={[styles.input, { backgroundColor: theme.input, borderColor: theme.border, color: activeTextColor }]} value={serial} onChangeText={setSerial} placeholder="S/N..." placeholderTextColor={theme.muted} />
+        <Text style={[styles.label, { color: theme.accent }]}>Основна Информация</Text>
+        <TextInput style={[styles.input, { backgroundColor: theme.input, borderColor: theme.border, color: theme.text }]} placeholder="Име (напр. Глок 19)" placeholderTextColor={theme.muted} value={name} onChangeText={setName} />
+        <TextInput style={[styles.input, { backgroundColor: theme.input, borderColor: theme.border, color: theme.text, fontFamily: 'Courier New' }]} placeholder="Сериен Номер (S/N)" placeholderTextColor={theme.muted} value={serial} onChangeText={setSerial} />
 
-      <Text style={[styles.label, { color: theme.accent }]}>Спецификации</Text>
-      
-      <Dropdown 
-        style={[styles.dropdown, { backgroundColor: theme.input, borderColor: theme.border }]} 
-        selectedTextStyle={{ color: activeTextColor }} placeholderStyle={{ color: theme.muted }} 
-        containerStyle={{ backgroundColor: theme.card, borderColor: theme.border }} itemTextStyle={{ color: activeTextColor }} activeColor={theme.border} 
-        data={TYPE_DATA} labelField="label" valueField="value" value={type} placeholder="Избери тип" 
-        onChange={i => { 
-          setType(i.value); 
-          const firstMfr = MFR_MAP[i.value]?.[0]?.value || 'Друго';
-          const firstCaliber = CALIBERS_BY_TYPE[i.value]?.[0]?.value || 'Друго';
-          setManufacturer(firstMfr); 
-          setCaliber(firstCaliber); // 👈 Auto-switches caliber to match the new gun type
-        }} 
-      />
-      
-      <Dropdown 
-        style={[styles.dropdown, { backgroundColor: theme.input, borderColor: theme.border }]} 
-        selectedTextStyle={{ color: activeTextColor }} placeholderStyle={{ color: theme.muted }} 
-        containerStyle={{ backgroundColor: theme.card, borderColor: theme.border }} itemTextStyle={{ color: activeTextColor }} activeColor={theme.border} 
-        data={MFR_MAP[type] || MFR_MAP['Пистолет']} labelField="label" valueField="value" value={manufacturer} placeholder="Избери марка" 
-        onChange={i => {
-          setManufacturer(i.value);
-          if (i.value === 'Arsenal' && type === 'Пистолет') setCaliber('9x18mm Makarov'); // 👈 Auto-selects 9x18 for Makarov
-        }} 
-      />
-      
-      <Dropdown 
-        style={[styles.dropdown, { backgroundColor: theme.input, borderColor: theme.border }]} 
-        selectedTextStyle={{ color: activeTextColor }} placeholderStyle={{ color: theme.muted }} 
-        containerStyle={{ backgroundColor: theme.card, borderColor: theme.border }} itemTextStyle={{ color: activeTextColor }} activeColor={theme.border} 
-        // 👈 If Makarov, only show 9x18 and 9x19. Otherwise, show the list for that specific gun type!
-        data={manufacturer === 'Arsenal' && type === 'Пистолет' ? [{ label: '9x18mm Makarov', value: '9x18mm Makarov' }, { label: '9x19mm Parabellum', value: '9x19mm' }, { label: 'Друго', value: 'Друго' }] : (CALIBERS_BY_TYPE[type] || CALIBERS_BY_TYPE['Пистолет'])} 
-        labelField="label" valueField="value" value={caliber} placeholder="Избери калибър" 
-        onChange={i => setCaliber(i.value)} 
-      />
+        <Text style={[styles.label, { color: theme.accent }]}>Спецификации</Text>
+        <Dropdown 
+          style={[styles.dropdown, { backgroundColor: theme.input, borderColor: theme.border }]} 
+          selectedTextStyle={{ color: theme.accent, fontWeight: 'bold' }} 
+          placeholderStyle={{ color: theme.muted }} 
+          containerStyle={{ backgroundColor: theme.card, borderColor: theme.border }} 
+          itemContainerStyle={{ backgroundColor: theme.card }} 
+          itemTextStyle={{ color: theme.accent }} 
+          activeColor={theme.bg} 
+          iconColor={theme.muted} 
+          data={TYPE_DATA} 
+          labelField="label" 
+          valueField="value" 
+          value={type} 
+          placeholder="Избери тип" 
+          onChange={i => { 
+            setType(i.value); 
+            const newMfr = MFR_MAP[i.value]?.[0]?.value || 'Друго';
+            setManufacturer(newMfr);
+            const newCalibers = getAvailableCalibers(i.value, newMfr);
+            setCaliber(newCalibers[0].value); // Auto-selects the first caliber
+          }} 
+        />
+        
+        {/* 2. MANUFACTURER DROPDOWN */}
+        <Dropdown 
+          style={[styles.dropdown, { backgroundColor: theme.input, borderColor: theme.border }]} 
+          selectedTextStyle={{ color: theme.accent, fontWeight: 'bold' }} 
+          placeholderStyle={{ color: theme.muted }} 
+          containerStyle={{ backgroundColor: theme.card, borderColor: theme.border }} 
+          itemContainerStyle={{ backgroundColor: theme.card }} 
+          itemTextStyle={{ color: theme.accent }} 
+          activeColor={theme.bg} 
+          iconColor={theme.muted} 
+          data={MFR_MAP[type] || MFR_MAP['Пистолет']} 
+          labelField="label" 
+          valueField="value" 
+          value={manufacturer} 
+          placeholder="Избери марка" 
+          onChange={i => {
+            setManufacturer(i.value);
+            const newCalibers = getAvailableCalibers(type, i.value);
+            setCaliber(newCalibers[0].value); // Instantly swaps to the correct ammo!
+          }} 
+        />
+        
+        {/* 3. CALIBER DROPDOWN */}
+        <Dropdown 
+          style={[styles.dropdown, { backgroundColor: theme.input, borderColor: theme.border }]} 
+          selectedTextStyle={{ color: theme.accent, fontWeight: 'bold' }} 
+          placeholderStyle={{ color: theme.muted }} 
+          containerStyle={{ backgroundColor: theme.card, borderColor: theme.border }} 
+          itemContainerStyle={{ backgroundColor: theme.card }} 
+          itemTextStyle={{ color: theme.accent }} 
+          activeColor={theme.bg} 
+          iconColor={theme.muted} 
+          data={availableCalibers} // 👈 FIX: Uses the dynamically filtered list!
+          labelField="label" 
+          valueField="value" 
+          value={caliber} 
+          placeholder="Избери калибър" 
+          onChange={i => setCaliber(i.value)} 
+        />
+        
+        <TextInput style={[styles.input, styles.numInput, { backgroundColor: theme.input, borderColor: theme.border, color: theme.text }]} placeholder="Тегло (грама)" placeholderTextColor={theme.muted} value={weight} onChangeText={setWeight} keyboardType="numeric" />
+        <TextInput style={[styles.input, styles.numInput, { backgroundColor: theme.input, borderColor: theme.border, color: theme.text }]} placeholder="Капацитет (брой патрони)" placeholderTextColor={theme.muted} value={capacity} onChangeText={setCapacity} keyboardType="numeric" />
 
-      <View style={{ flexDirection: 'row', gap: 10, marginTop: 5 }}>
-        <TextInput style={[styles.input, { flex: 1, backgroundColor: theme.input, borderColor: theme.border, color: activeTextColor }]} value={weight} onChangeText={setWeight} placeholder="Тегло (гр)" keyboardType="numeric" placeholderTextColor={theme.muted} />
-        <TextInput style={[styles.input, { flex: 1, backgroundColor: theme.input, borderColor: theme.border, color: activeTextColor }]} value={capacity} onChangeText={setCapacity} placeholder="Капацитет" keyboardType="numeric" placeholderTextColor={theme.muted} />
-      </View>
+        <Text style={[styles.label, { color: theme.accent }]}>Визуална Идентификация</Text>
+        <TouchableOpacity style={[styles.imagePickerArea, { backgroundColor: theme.input, borderColor: imageSelectorPressed ? 'transparent' : theme.border }]} onPress={handleImageSelection} activeOpacity={0.7} onPressIn={() => setImageSelectorPressed(true)} onPressOut={() => setImageSelectorPressed(false)}>
+          {imageObject ? (
+            <Image source={{ uri: imageObject.uri }} style={styles.imagePreview} />
+          ) : (
+            <View style={styles.placeholderBox}>
+              <Text style={{ color: theme.accent, fontSize: 13, fontWeight: '700' }}>[ДОБАВИ СНИМКА]</Text>
+              <Text style={{ color: theme.muted, fontSize: 10, marginTop: 4 }}>Камера или Галерия</Text>
+            </View>
+          )}
+        </TouchableOpacity>
 
-      <Text style={[styles.label, { color: theme.accent }]}>КОС & Снимка</Text>
-      <TouchableOpacity style={[styles.input, { backgroundColor: theme.input, borderColor: theme.border }]} onPress={() => setShowPicker(true)}>
-        <Text style={{ color: activeTextColor }}>Дата на КОС: {date.toLocaleDateString('bg-BG')}</Text>
-      </TouchableOpacity>
-      {showPicker && <DateTimePicker value={date} mode="date" display={Platform.OS === 'ios' ? 'spinner' : 'default'} onChange={(e, d) => { setShowPicker(false); if (d) setDate(d); }} />}
-      
-      <TouchableOpacity style={[styles.imagePickerBox, { backgroundColor: theme.input, borderColor: theme.border }]} onPress={pickImage}>
-        {imageObject ? <Image source={{ uri: imageObject.uri }} style={styles.imagePreview} /> : <View style={styles.imagePickerPlaceholder}><Ionicons name="camera" size={32} color={theme.muted} /><Text style={{ color: theme.muted, marginTop: 8, fontWeight: '600' }}>Избери снимка</Text></View>}
-      </TouchableOpacity>
-
-      <TouchableOpacity style={[styles.btn, { backgroundColor: theme.accent }]} onPress={handleSave} disabled={loading}>
-        {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.btnText}>ЗАПИШИ</Text>}
-      </TouchableOpacity>
-    </ScrollView>
+        <TouchableOpacity style={[styles.saveBtn, { backgroundColor: theme.accent, opacity: loading ? 0.7 : 1 }]} onPress={handleSave} disabled={loading}>
+          {loading ? <ActivityIndicator color="#000" /> : <Text style={styles.saveBtnText}>ДОБАВИ ОРЪЖИЕ</Text>}
+        </TouchableOpacity>
+        
+        <View style={{ height: 100 }} />
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 }, scroll: { padding: 20, paddingBottom: 60 }, title: { fontSize: 26, fontWeight: '900', marginTop: 20 },
-  label: { fontSize: 13, fontWeight: '800', marginTop: 15, marginBottom: 8, letterSpacing: 1.2 }, input: { borderRadius: 10, padding: 16, borderWidth: 1, marginBottom: 12 },
-  dropdown: { borderRadius: 10, padding: 12, borderWidth: 1, marginBottom: 12 }, imagePickerBox: { height: 160, borderRadius: 10, borderWidth: 1, borderStyle: 'dashed', overflow: 'hidden', marginTop: 5 },
-  imagePickerPlaceholder: { flex: 1, justifyContent: 'center', alignItems: 'center' }, imagePreview: { width: '100%', height: '100%', resizeMode: 'cover' },
-  btn: { padding: 18, borderRadius: 12, alignItems: 'center', marginTop: 30, marginBottom: 10 }, btnText: { color: 'white', fontWeight: '900', letterSpacing: 1.5 }
+  container: { flex: 1 }, scroll: { paddingHorizontal: 20 }, title: { fontSize: 26, fontWeight: '900'},
+  label: { fontSize: 10, letterSpacing: 1.5, fontWeight: '800', marginTop: 15, marginBottom: 10 },
+  input: { borderRadius: Radius.md, padding: Spacing.md, borderWidth: 1, marginBottom: 10 }, 
+  numInput: { fontSize: 13 },
+  saveBtn: { marginTop: 30, padding: 18, borderRadius: Radius.md, alignItems: 'center' },
+  saveBtnText: { color: '#000', fontWeight: '900', letterSpacing: 2, fontSize: 14 },
+  imagePickerArea: { height: 180, borderRadius: Radius.lg, borderWidth: 1, overflow: 'hidden', justifyContent: 'center', alignItems: 'center' },
+  imagePreview: { width: '100%', height: '100%', resizeMode: 'cover' },
+  placeholderBox: { alignItems: 'center' },
+  dropdown: { borderRadius: 10, padding: 12, borderWidth: 1, marginBottom: 10 }
 });

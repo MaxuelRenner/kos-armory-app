@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, Alert, Switch, Linking, ScrollView } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { View, Text, TouchableOpacity, StyleSheet, Alert, Switch, Linking, ScrollView } from 'react-native';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '../../constants/supabase';
@@ -8,6 +9,7 @@ import { useTheme, ThemeType } from '../../context/ThemeContext';
 export default function SettingsScreen() {
   const router = useRouter();
   const { theme, themeName, changeTheme } = useTheme();
+  const insets = useSafeAreaInsets();
   const [notifKos, setNotifKos] = useState(true);
   const [notifCleaning, setNotifCleaning] = useState(true);
 
@@ -41,15 +43,23 @@ export default function SettingsScreen() {
   const themes: { key: ThemeType; label: string; icon: string }[] = [
     { key: 'industrial', label: 'Индустриална (Metal/Red)', icon: '⚫' },
     { key: 'military',   label: 'Военна (Камуфлаж)',       icon: '🪖' },
-    { key: 'girlypop',  label: 'Girly Pop (Pink)',         icon: '🌸' },
+    { key: 'girlypop',  label: 'Girly Pop (Pink)',        icon: '🌸' },
     { key: 'light',     label: 'Светла (White)',            icon: '⚪' },
   ];
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: theme.bg }]}>
-      <ScrollView showsVerticalScrollIndicator={false}>
-        <Text style={[styles.title, { color: theme.text }]}>Настройки</Text>
-
+    // Fixed wrapper tag mismatch
+    <View style={[styles.container, { backgroundColor: theme.bg, paddingTop: insets.top + 20 }]}>
+      
+      {/* Fixed: Removed duplicate titles and used the correct 'title' style */}
+      <Text style={[styles.title, { color: theme.text, paddingHorizontal: 20 }]}>
+        Настройки
+      </Text>
+      
+      <ScrollView 
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 140 }} 
+      >
         {/* ─── THEMES ──────────────────────────────────────────────────── */}
         <Text style={[styles.sectionLabel, { color: theme.muted }]}>ТЕМА НА ПРИЛОЖЕНИЕТО</Text>
         <View style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border }]}>
@@ -98,7 +108,6 @@ export default function SettingsScreen() {
         <Text style={[styles.sectionLabel, { color: theme.muted }]}>ИНФОРМАЦИЯ</Text>
         <View style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border }]}>
           
-          {/* View Guide — re-opens onboarding */}
           <TouchableOpacity
             style={styles.row}
             onPress={() => router.push('/onboarding')}
@@ -109,7 +118,6 @@ export default function SettingsScreen() {
 
           <View style={[styles.divider, { backgroundColor: theme.border }]} />
 
-          {/* MVR Link */}
           <TouchableOpacity style={styles.row} onPress={openMVR}>
             <View style={{ flex: 1 }}>
               <Text style={[styles.rowText, { color: theme.text }]}>🏛 МВР — Разрешителни за оръжие</Text>
@@ -130,13 +138,14 @@ export default function SettingsScreen() {
 
         <View style={{ height: 40 }} />
       </ScrollView>
-    </SafeAreaView>
+    </View> // Fixed closing tag
   );
 }
 
+// Cleaned up styles container padding to let the ScrollView handle it
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 20 },
-  title: { fontSize: 28, fontWeight: '800', marginBottom: 30, marginTop: 20 },
+  container: { flex: 1 }, 
+  title: { fontSize: 28, fontWeight: '800', marginBottom: 15 },
   sectionLabel: { fontSize: 11, fontWeight: '700', letterSpacing: 1, marginBottom: 10, marginLeft: 5 },
   card: { borderRadius: 12, borderWidth: 1, overflow: 'hidden', marginBottom: 28 },
   row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 18 },
