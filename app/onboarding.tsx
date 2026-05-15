@@ -35,7 +35,7 @@ export default function OnboardingScreen({ onFinish }: { onFinish?: () => void }
           <Text style={[styles.stepDesc, { color: theme.muted, textAlign: 'center'  }]}>В таб "Добави" въвеждате цялата техническа информация:</Text>
           <Text style={[styles.bullet, { color: theme.muted }]}><Text style={{ color: theme.text, fontWeight: 'bold' }}>• Спецификации:</Text> Въведете име и сериен номер, изберете модел, тип и калибър чрез менюта. Въведете незареденото тегло на оръжието ви и зареденият му капацитет.</Text>
           <Text style={[styles.bullet, { color: theme.muted }]}><Text style={{ color: theme.text, fontWeight: 'bold' }}>• Документация:</Text> Системата автоматично изчислява 5-годишния срок на разрешителното ви.</Text>
-          <Text style={[styles.bullet, { color: theme.muted }]}><Text style={{ color: theme.text, fontWeight: 'bold' }}>• Снимки:</Text> Можете да добавете и снимка за по-бързо и лесно разпознаване.</Text>
+          <Text style={[styles.bullet, { color: theme.muted }]}><Text style={{ color: theme.text, fontWeight: 'bold' }}>• Снимки:</Text> Можете да добавите и снимка за по-бързо и лесно разпознаване.</Text>
         </View>
       )
     },
@@ -70,7 +70,7 @@ export default function OnboardingScreen({ onFinish }: { onFinish?: () => void }
         <View>
           <Text style={[styles.stepDesc, { color: theme.muted, textAlign: 'center'  }]}>Грижата за оръжието е ключова:</Text>
           <Text style={[styles.bullet, { color: theme.muted }]}><Text style={{ color: theme.text, fontWeight: 'bold' }}>• Тренировки:</Text> Всяко ползване се записва в историята на оръжието ви, чрез бутонът "Тренировка".</Text>
-          <Text style={[styles.bullet, { color: theme.muted }]}><Text style={{ color: theme.text, fontWeight: 'bold' }}>• Напомняния:</Text> Система ви подсеща да почиствате оръжията си след стрелба.</Text>
+          <Text style={[styles.bullet, { color: theme.muted }]}><Text style={{ color: theme.text, fontWeight: 'bold' }}>• Напомняния:</Text> Системата ви подсеща да почиствате оръжията си след стрелба.</Text>
           <Text style={[styles.bullet, { color: theme.muted }]}><Text style={{ color: theme.text, fontWeight: 'bold' }}>• Индикатор:</Text> Оръжието ви ще свети с визуален маркер "За почистване", докато не го отметнете като обслужено.</Text>
         </View>
       )
