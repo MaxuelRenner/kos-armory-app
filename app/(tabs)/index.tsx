@@ -1,8 +1,5 @@
 import React, { useState, useMemo, useCallback } from 'react';
-import {
-  View, Text, FlatList, StyleSheet, Pressable, RefreshControl, ActivityIndicator,
-  Image, TextInput
-} from 'react-native';
+import { View, Text, FlatList, StyleSheet, Pressable, RefreshControl, ActivityIndicator, Image, TextInput } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
@@ -13,7 +10,6 @@ import { useTheme } from '../../context/ThemeContext';
 import { Dropdown } from 'react-native-element-dropdown';
 
 const STATUS_PRIORITY: Record<GunStatus, number> = { danger: 0, warning: 1, good: 2 };
-
 const FILTER_TYPES = [
   { label: 'Всички', value: 'Всички' },
   { label: 'Пистолет', value: 'Пистолет' },
@@ -88,14 +84,11 @@ function GunCard({ gun, onPress }: { gun: any; onPress: () => void }) {
       onPress={onPress}
       onPressIn={() => setPressed(true)}
       onPressOut={() => setPressed(false)}
-      style={[
-        styles.card,
+      style={[styles.card,
         { backgroundColor: theme.card, borderColor: theme.border },
         { transform: [{ scale: pressed ? 0.97 : 1 }] },
-      ]}
-    >
+      ]}>
       <View style={[styles.cardStrip, { backgroundColor: Colors.status[status].dot }]} />
-
       <View style={styles.cardImageArea}>
         {gun.image_url ? (
           <Image source={{ uri: gun.image_url }} style={styles.gunImage} />
@@ -108,15 +101,11 @@ function GunCard({ gun, onPress }: { gun: any; onPress: () => void }) {
           <Text style={styles.serialText}>S/N: {gun.serial_number}</Text>
         </View>
       </View>
-
       <View style={styles.cardBody}>
-        {/* 👈 FIXED: Grouped the top text so it stays at the top */}
         <View>
           <Text style={[styles.cardName, { color: theme.text }]} numberOfLines={1}>{gun.name}</Text>
           <Text style={[styles.cardMfr, { color: theme.muted }]} numberOfLines={1}>{gun.manufacturer || '—'}</Text>
         </View>
-
-        {/* 👈 FIXED: Grouped the badges so space-between pushes them to the absolute bottom perfectly! */}
         <View style={{ gap: 6 }}>
           {gun.needs_cleaning && <CleaningBadge lastCleaned={gun.last_cleaned_date} />}
           <StatusBadge status={status} expiryDate={gun.kosExpiryDate} />
@@ -136,13 +125,11 @@ export default function ArmoryScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState('Всички');
   const [caliberFilter, setCaliberFilter] = useState('Всички');
-
   const fetchGuns = useCallback(async () => {
     const { data } = await supabase
       .from('firearms')
       .select('*')
       .order('created_at', { ascending: false });
-
     if (data) {
       const processed = data.map((g) => {
         const activeDateStr = g.last_renewed_date || g.kos_registration_date;
@@ -150,19 +137,16 @@ export default function ArmoryScreen() {
         const expiryDate = new Date(activeDate);
         expiryDate.setFullYear(expiryDate.getFullYear() + 5);
         const isoExpiry = expiryDate.toISOString().split('T')[0];
-
         const days = getDaysUntilExpiry(isoExpiry);
         let status: GunStatus = 'good';
         if (days <= 0) status = 'danger';
         else if (days <= 30) status = 'warning';
-
         return { ...g, kosExpiryDate: isoExpiry, kosStatus: status, daysUntilExpiry: days };
       });
 
       const sorted = processed.sort((a, b) => {
         const pa = a.needs_cleaning && a.kosStatus === 'good' ? 1.5 : STATUS_PRIORITY[a.kosStatus as GunStatus];
         const pb = b.needs_cleaning && b.kosStatus === 'good' ? 1.5 : STATUS_PRIORITY[b.kosStatus as GunStatus];
-
         if (pa !== pb) return pa - pb;
         return a.daysUntilExpiry - b.daysUntilExpiry;
       });
@@ -182,14 +166,11 @@ export default function ArmoryScreen() {
         gun.name?.toLowerCase().includes(q) ||
         gun.serial_number?.toLowerCase().includes(q) ||
         gun.manufacturer?.toLowerCase().includes(q);
-
       const matchesType = typeFilter === 'Всички' || gun.type === typeFilter;
       const matchesCaliber = caliberFilter === 'Всички' || (gun.caliber && gun.caliber.includes(caliberFilter));
-
       return matchesSearch && matchesType && matchesCaliber;
     });
   }, [guns, searchQuery, typeFilter, caliberFilter]);
-
   if (loading && !refreshing) {
     return (
       <View style={[styles.container, { backgroundColor: theme.bg, justifyContent: 'center' }]}>
@@ -213,11 +194,10 @@ export default function ArmoryScreen() {
           <>
             <View style={styles.header}>
               <View>
-                <Text style={[styles.headerEyebrow, { color: theme.accent }]}>ЦИФРОВ АРСЕНАЛ</Text>
+                <Text style={[styles.headerEyebrow, { color: theme.accent }]}>ПЪЛЕН АРСЕНАЛ</Text>
                 <Text style={[styles.headerTitle, { color: theme.text }]}>МОИ ОРЪЖИЯ</Text>
               </View>
             </View>
-
             <View style={styles.searchWrap}>
               <TextInput
                 style={[styles.searchInput, { backgroundColor: theme.input, borderColor: theme.border, color: theme.text }]}
@@ -228,7 +208,6 @@ export default function ArmoryScreen() {
                 clearButtonMode="while-editing"
               />
             </View>
-
             <View style={{ flexDirection: 'row', gap: 10, marginBottom: 15 }}>
             <Dropdown
                 style={[styles.filterDropdown, { backgroundColor: theme.input, borderColor: theme.border }]}
@@ -236,24 +215,22 @@ export default function ArmoryScreen() {
                 placeholderStyle={{ color: theme.muted, fontSize: 12 }}
                 containerStyle={{ backgroundColor: theme.card, borderColor: theme.border }}
                 itemContainerStyle={{ backgroundColor: theme.card }} 
-                itemTextStyle={{ color: theme.accent, fontSize: 12 }} // 👈 FIX: List text is now the Accent Color
-                activeColor={theme.bg} // 👈 FIX
+                itemTextStyle={{ color: theme.accent, fontSize: 12 }}
+                activeColor={theme.bg}
                 data={FILTER_TYPES}
                 labelField="label"
                 valueField="value"
                 value={typeFilter}
                 placeholder="Всички типове"
-                onChange={(i) => setTypeFilter(i.value)}
-              />
-
+                onChange={(i) => setTypeFilter(i.value)}/>
               <Dropdown
                 style={[styles.filterDropdown, { backgroundColor: theme.input, borderColor: theme.border }]}
                 selectedTextStyle={{ color: theme.accent, fontSize: 12, fontWeight: '700' }}
                 placeholderStyle={{ color: theme.muted, fontSize: 12 }}
                 containerStyle={{ backgroundColor: theme.card, borderColor: theme.border }}
                 itemContainerStyle={{ backgroundColor: theme.card }} 
-                itemTextStyle={{ color: theme.accent, fontSize: 12 }} // 👈 FIX: List text is now the Accent Color
-                activeColor={theme.bg} // 👈 FIX
+                itemTextStyle={{ color: theme.accent, fontSize: 12 }}
+                activeColor={theme.bg}
                 data={FILTER_CALIBERS}
                 labelField="label"
                 valueField="value"
@@ -262,10 +239,9 @@ export default function ArmoryScreen() {
                 onChange={(i) => setCaliberFilter(i.value)}
               />
             </View>
-
             {filteredGuns.some((g) => g.kosStatus === 'danger') && (
               <View style={styles.alertBanner}>
-                <Text style={styles.alertText}>⚠ Имате оръжия с изтекъл КОС!</Text>
+                <Text style={styles.alertText}>⚠ Имате оръжия с изтекъло разрешително!</Text>
               </View>
             )}
           </>
@@ -291,13 +267,12 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   listContent: { paddingHorizontal: Spacing.md, paddingBottom: 100 },
   header: { marginTop: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: Spacing.lg },
-  headerEyebrow: { fontSize: 10, letterSpacing: 3, marginBottom: 4, fontWeight: '800' },
+  headerEyebrow: { fontSize: 10, letterSpacing: 1.5, marginBottom: 4, fontWeight: '800' },
   headerTitle: { fontSize: 28, fontWeight: '900', letterSpacing: 1 },
   searchWrap: { marginBottom: Spacing.sm },
   searchInput: { borderRadius: Radius.md, padding: Spacing.md, borderWidth: 1 },
   alertBanner: { backgroundColor: Colors.status.danger.bg, borderWidth: 1, borderColor: Colors.status.danger.border, borderRadius: Radius.md, padding: 12, marginBottom: Spacing.md, marginTop: 8 },
   alertText: { color: Colors.status.danger.text, fontSize: 12, fontWeight: '700', textAlign: 'center' },
-
   card: { flex: 1, minWidth: '45%', maxWidth: '48%', borderRadius: Radius.lg, borderWidth: 1, overflow: 'hidden', ...Shadow.card, flexDirection: 'column' },
   cardStrip: { height: 3, width: '100%' },
   cardImageArea: { height: 110, width: '100%', overflow: 'hidden', borderBottomWidth: 1, borderColor: '#222' },
@@ -307,7 +282,6 @@ const styles = StyleSheet.create({
   cardBody: { padding: Spacing.sm, paddingTop: 8, gap: 4, flex: 1, justifyContent: 'space-around' },
   cardName: { fontSize: 14, fontWeight: '800', height: 20 },
   cardMfr: { fontSize: 10, marginBottom: 2, fontWeight: '500' },
-
   badge: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 6, paddingVertical: 3, borderRadius: Radius.full, borderWidth: 1, alignSelf: 'flex-start' },
   badgeDot: { width: 5, height: 5, borderRadius: 3 },
   badgeText: { fontSize: 8, fontWeight: '700' },

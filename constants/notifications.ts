@@ -2,7 +2,6 @@ import * as Notifications from 'expo-notifications';
 import { LogBox } from 'react-native';
 
 LogBox.ignoreLogs(['expo-notifications: Android Push notifications']);
-
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
     shouldShowAlert: true,
@@ -19,7 +18,7 @@ export const scheduleCleaningReminders = async (gunName: string): Promise<string
     for (let i = 1; i <= 5; i++) {
       const id = await Notifications.scheduleNotificationAsync({
         content: {
-          title: `🧼 Напомняне за почистване (${i}/5)`,
+          title: `Напомняне за почистване (${i}/5)`,
           body: `${gunName} трябва да се почисти след тренировка. Не забравяйте!`,
           data: { gunName, reminderIndex: i },
         },
@@ -48,13 +47,11 @@ export const scheduleKosRenewalNotification = async (gunName: string, expiryDate
   const expiryDate = new Date(expiryDateStr);
   const notificationDate = new Date(expiryDate);
   notificationDate.setDate(notificationDate.getDate() - 30);
-
   if (notificationDate <= new Date()) return null;
-
   try {
     const id = await Notifications.scheduleNotificationAsync({
       content: {
-        title: '⚠ КОС Разрешително изтича',
+        title: '⚠ Разрешително изтича!',
         body: `Разрешителното за ${gunName} изтича след 30 дни. Подгответе документите за подновяване.`,
         data: { gunName, type: 'kos_renewal' },
       },

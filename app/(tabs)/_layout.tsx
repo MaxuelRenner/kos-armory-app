@@ -25,20 +25,16 @@ export default function TabLayout() {
           fontSize: 10,
           fontWeight: '800',
         }
-      }}
-    >
+      }}>
       <Tabs.Screen
         name="index"
-        options={{ title: 'Арсенал', tabBarIcon: ({ color }) => <Ionicons name="shield-checkmark" size={24} color={color} /> }}
-      />
+        options={{ title: 'Арсенал', tabBarIcon: ({ color }) => <Ionicons name="shield-checkmark" size={24} color={color} /> }}/>
       <Tabs.Screen
         name="add-gun"
-        options={{ title: 'Добави', tabBarIcon: ({ color }) => <Ionicons name="add-circle" size={26} color={color} /> }}
-      />
+        options={{ title: 'Добави', tabBarIcon: ({ color }) => <Ionicons name="add-circle" size={26} color={color} /> }}/>
       <Tabs.Screen
         name="settings"
-        options={{ title: 'Настройки', tabBarIcon: ({ color }) => <Ionicons name="settings" size={24} color={color} /> }}
-      />
+        options={{ title: 'Настройки', tabBarIcon: ({ color }) => <Ionicons name="settings" size={24} color={color} /> }}/>
     </Tabs>
   );
 }

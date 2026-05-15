@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "КОС Арсенал",
-    "slug": "kos-armory-app",
+    "name": "Арсенал БГ",
+    "slug": "arsenal-bg-app",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "scheme": "kos-armory",
+    "scheme": "arsenal-bg",
     "userInterfaceStyle": "dark",
     "splash": {
       "image": "./assets/splash-icon.png",
@@ -14,7 +14,8 @@
     },
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "bg.kosarmory.app"
+      "bundleIdentifier": "bg.arsenalbg.app",
+      "buildNumber": "1"
     },
     "android": {
       "adaptiveIcon": {
@@ -23,7 +24,12 @@
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": true,
-      "package": "bg.kosarmory.app"
+      "package": "bg.arsenalbg.app",
+      "versionCode": 1,
+      "softwareKeyboardLayoutMode": "resize",
+      "permissions": [
+        "android.permission.RECORD_AUDIO"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -49,7 +55,7 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "2a581a11-22c1-4398-ab62-168249430e25"
+        "projectId": "dc1ea87f-530c-480b-a8b2-206504710e5b"
       }
     },
     "owner": "maxuelrenner"

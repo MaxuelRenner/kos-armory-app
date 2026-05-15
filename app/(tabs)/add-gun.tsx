@@ -1,8 +1,5 @@
 import React, { useState, useCallback, useRef } from 'react';
-import { 
-  View, Text, TextInput, ScrollView, TouchableOpacity, 
-  StyleSheet, Alert, ActivityIndicator, Image
-} from 'react-native';
+import { View, Text, TextInput, ScrollView, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, Image} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native'; 
@@ -109,8 +106,6 @@ const CALIBERS_BY_TYPE: Record<string, { label: string, value: string }[]> = {
     { label: '28 Gauge', value: '28 Gauge' }, { label: '.410 Bore', value: '.410 Bore' }, { label: 'Друго', value: 'Друго' }
   ]
 };
-
-// 👈 NEW: Smart Filter Logic
 const getAvailableCalibers = (currentType: string, currentMfr: string) => {
   if (currentType === 'Пистолет') {
     if (currentMfr === 'Makarov') return [{ label: '9x18mm Makarov', value: '9x18mm Makarov' }, { label: '.380 ACP', value: '.380 ACP' }, { label: 'Друго', value: 'Друго' }];
@@ -122,29 +117,33 @@ const getAvailableCalibers = (currentType: string, currentMfr: string) => {
     if (currentMfr === 'Arsenal' || currentMfr === 'Zastava') return [{ label: '7.62x39mm', value: '7.62x39mm' }, { label: '5.56x45mm NATO', value: '5.56x45mm' }, { label: '5.45x39mm', value: '5.45x39mm' }, { label: 'Друго', value: 'Друго' }];
     if (currentMfr === 'Colt' || currentMfr === 'Daniel Defense' || currentMfr === 'BCM' || currentMfr === 'Aero Precision') return [{ label: '5.56x45mm NATO / .223 Rem', value: '5.56x45mm' }, { label: '.300 Blackout', value: '.300 Blackout' }, { label: 'Друго', value: 'Друго' }];
   }
-  
-  // If we don't have a specific rule for the manufacturer, return the full list for that weapon type
   return CALIBERS_BY_TYPE[currentType] || CALIBERS_BY_TYPE['Пистолет'];
+};
+
+const VALIDATION_LIMITS: Record<string, { minWeight: number, maxWeight: number, minCap: number, maxCap: number }> = {
+  'Пистолет': { minWeight: 200, maxWeight: 2500, minCap: 1, maxCap: 34 },
+  'Револвер': { minWeight: 200, maxWeight: 2500, minCap: 5, maxCap: 10 },
+  'SMG': { minWeight: 1000, maxWeight: 4500, minCap: 11, maxCap: 51 },
+  'Карабина': { minWeight: 2000, maxWeight: 6500, minCap: 1, maxCap: 101 },
+  'Болтова': { minWeight: 2000, maxWeight: 8000, minCap: 1, maxCap: 16 },
+  'Гладкоцевна': { minWeight: 2000, maxWeight: 5500, minCap: 1, maxCap: 16 }
 };
 
 export default function AddGunScreen() {
   const router = useRouter();
   const { theme } = useTheme();
   const insets = useSafeAreaInsets(); 
-
   const [name, setName] = useState('');
   const [serial, setSerial] = useState('');
   const [weight, setWeight] = useState('');
-  const [capacity, setCapacity] = useState(''); // 👈 FIXED: Memory added!
+  const [capacity, setCapacity] = useState('');
   const [loading, setLoading] = useState(false);
   const [imageObject, setImageObject] = useState<ImagePicker.ImagePickerAsset | null>(null);
   const [imageSelectorPressed, setImageSelectorPressed] = useState(false); 
-
   const [type, setType] = useState('Пистолет');
   const [manufacturer, setManufacturer] = useState('Glock');
   const [caliber, setCaliber] = useState('9x19mm');
   const availableCalibers = getAvailableCalibers(type, manufacturer);
-
   const isPickingImage = useRef(false);
 
   useFocusEffect(
@@ -170,7 +169,7 @@ export default function AddGunScreen() {
     isPickingImage.current = true; 
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
     if (status !== 'granted') {
-      Alert.alert("Грешка", "Необходим е достъп до камерата за тази функция.");
+      Alert.alert("Грешка!", "Необходим е достъп до камерата за тази функция.");
       setTimeout(() => { isPickingImage.current = false; }, 500);
       return;
     }
@@ -178,7 +177,7 @@ export default function AddGunScreen() {
       let result = await ImagePicker.launchCameraAsync({ allowsEditing: true, aspect: [4, 3], quality: 0.5 });
       if (!result.canceled && result.assets && result.assets.length > 0) setImageObject(result.assets[0]);
     } catch (error: any) {
-      Alert.alert("Грешка при камерата", error.message || "Неуспешен старт на камерата.");
+      Alert.alert("Грешка при камерата!", error.message || "Неуспешен старт на камерата.");
     } finally {
       setTimeout(() => { isPickingImage.current = false; }, 500);
     }
@@ -190,41 +189,65 @@ export default function AddGunScreen() {
       let result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, allowsEditing: true, aspect: [4, 3], quality: 0.5 });
       if (!result.canceled && result.assets && result.assets.length > 0) setImageObject(result.assets[0]);
     } catch (error: any) {
-      Alert.alert("Грешка при галерията", error.message || "Неуспешен достъп до галерията.");
+      Alert.alert("Грешка при галерията!", error.message || "Неуспешен достъп до галерията.");
     } finally {
       setTimeout(() => { isPickingImage.current = false; }, 500);
     }
   };
 
   const handleSave = async () => {
-    if (!name || !serial) return Alert.alert("Внимание", "Име и сериен номер са задължителни.");
-    
+    const trimmedName = name.trim();
+    const trimmedSerial = serial.trim();
+    if (!trimmedName || !trimmedSerial) {
+      return Alert.alert("Внимание!", "Име и сериен номер са задължителни!");
+    }
+    if (trimmedName.length < 4) {
+      return Alert.alert("Внимание!", "Името трябва да съдържа поне 4 символа!");
+    }
+    if (trimmedSerial.length < 5) {
+      return Alert.alert("Внимание!", "Серийният номер трябва да е поне 5 символа.");
+    }
+    const limits = VALIDATION_LIMITS[type] || { minWeight: 50, maxWeight: 15000, minCap: 1, maxCap: 201 };
     const weightNum = parseInt(weight);
     const capacityNum = parseInt(capacity);
-
+    if (!weight || isNaN(weightNum) || weightNum < limits.minWeight || weightNum > limits.maxWeight) {
+      return Alert.alert(
+        "Невалидно тегло!", 
+        `За ${type.toLowerCase()} теглото е задължително и трябва да е между ${limits.minWeight} и ${limits.maxWeight} гр.`
+      );
+    }
+    if (!capacity || isNaN(capacityNum) || capacityNum < limits.minCap || capacityNum > limits.maxCap) {
+      return Alert.alert(
+        "Невалиден капацитет!", 
+        `За ${type.toLowerCase()} капацитетът е задължителен и трябва да е между ${limits.minCap} и ${limits.maxCap}.`
+      );
+    }
     setLoading(true);
     let publicUrl = null;
-
     if (imageObject) {
       const { uri } = imageObject;
       const fileExt = uri.substring(uri.lastIndexOf('.') + 1);
       const fileName = `gun_${Date.now()}.${fileExt}`;
       const formData = new FormData();
       formData.append('file', { uri, name: fileName, type: `image/${fileExt === 'jpg' ? 'jpeg' : fileExt}` } as any);
-      
       const { error: uploadError } = await supabase.storage.from('gun-images').upload(fileName, formData);
       if (!uploadError) {
         const { data: publicUrlData } = supabase.storage.from('gun-images').getPublicUrl(fileName);
         publicUrl = publicUrlData.publicUrl;
       } else {
-        setLoading(false); return Alert.alert("Грешка при снимката", uploadError.message);
+        setLoading(false); 
+        return Alert.alert("Грешка при снимката", uploadError.message);
       }
     }
 
     const todayStr = new Date().toISOString().split('T')[0];
     const { error } = await supabase.from('firearms').insert([{
       user_id: (await supabase.auth.getUser()).data.user?.id,
-      name, serial_number: serial, type, manufacturer, caliber, 
+      name: trimmedName, 
+      serial_number: trimmedSerial, 
+      type, 
+      manufacturer, 
+      caliber, 
       weight_grams: isNaN(weightNum) ? null : weightNum, 
       capacity: isNaN(capacityNum) ? null : capacityNum,
       image_url: publicUrl,
@@ -232,20 +255,34 @@ export default function AddGunScreen() {
       last_cleaned_date: new Date().toISOString() 
     }]);
 
-    if (error) { Alert.alert("Грешка", error.message); } 
-    else { Alert.alert("Успешно!", "Оръжието е добавено в Арсенала."); router.replace('/(tabs)'); }
+    if (error) { 
+      Alert.alert("Грешка!", error.message); 
+    } else { 
+      Alert.alert("Успешно!", "Оръжието е добавено към арсенала ти."); 
+      router.replace('/(tabs)'); 
+    }
     setLoading(false);
   };
 
   return (
     <View style={[styles.container, { backgroundColor: theme.bg, paddingTop: insets.top + 20 }]}>
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+      <Text style={[styles.label, { color: theme.accent }]}>ОСНОВНА ИНФОРМАЦИЯ</Text>
         <Text style={[styles.title, { color: theme.text }]}>НОВО ОРЪЖИЕ</Text>
-
-        <Text style={[styles.label, { color: theme.accent }]}>Основна Информация</Text>
-        <TextInput style={[styles.input, { backgroundColor: theme.input, borderColor: theme.border, color: theme.text }]} placeholder="Име (напр. Глок 19)" placeholderTextColor={theme.muted} value={name} onChangeText={setName} />
-        <TextInput style={[styles.input, { backgroundColor: theme.input, borderColor: theme.border, color: theme.text, fontFamily: 'Courier New' }]} placeholder="Сериен Номер (S/N)" placeholderTextColor={theme.muted} value={serial} onChangeText={setSerial} />
-
+        <TextInput 
+          style={[styles.input, { backgroundColor: theme.input, borderColor: theme.border, color: theme.accent }]} 
+          placeholder="Напр. Glock 19 Gen 5" 
+          placeholderTextColor={theme.muted} 
+          value={name} 
+          onChangeText={setName} 
+        />
+        <TextInput 
+          style={[styles.input, { backgroundColor: theme.input, borderColor: theme.border, color: theme.accent }]} 
+          placeholder="Въведете сериен номер" 
+          placeholderTextColor={theme.muted} 
+          value={serial} 
+          onChangeText={setSerial} 
+        />
         <Text style={[styles.label, { color: theme.accent }]}>Спецификации</Text>
         <Dropdown 
           style={[styles.dropdown, { backgroundColor: theme.input, borderColor: theme.border }]} 
@@ -266,11 +303,8 @@ export default function AddGunScreen() {
             const newMfr = MFR_MAP[i.value]?.[0]?.value || 'Друго';
             setManufacturer(newMfr);
             const newCalibers = getAvailableCalibers(i.value, newMfr);
-            setCaliber(newCalibers[0].value); // Auto-selects the first caliber
-          }} 
-        />
-        
-        {/* 2. MANUFACTURER DROPDOWN */}
+            setCaliber(newCalibers[0].value);
+          }}/>
         <Dropdown 
           style={[styles.dropdown, { backgroundColor: theme.input, borderColor: theme.border }]} 
           selectedTextStyle={{ color: theme.accent, fontWeight: 'bold' }} 
@@ -288,11 +322,8 @@ export default function AddGunScreen() {
           onChange={i => {
             setManufacturer(i.value);
             const newCalibers = getAvailableCalibers(type, i.value);
-            setCaliber(newCalibers[0].value); // Instantly swaps to the correct ammo!
-          }} 
-        />
-        
-        {/* 3. CALIBER DROPDOWN */}
+            setCaliber(newCalibers[0].value);
+          }}/>
         <Dropdown 
           style={[styles.dropdown, { backgroundColor: theme.input, borderColor: theme.border }]} 
           selectedTextStyle={{ color: theme.accent, fontWeight: 'bold' }} 
@@ -302,17 +333,29 @@ export default function AddGunScreen() {
           itemTextStyle={{ color: theme.accent }} 
           activeColor={theme.bg} 
           iconColor={theme.muted} 
-          data={availableCalibers} // 👈 FIX: Uses the dynamically filtered list!
+          data={availableCalibers}
           labelField="label" 
           valueField="value" 
           value={caliber} 
           placeholder="Избери калибър" 
           onChange={i => setCaliber(i.value)} 
         />
-        
-        <TextInput style={[styles.input, styles.numInput, { backgroundColor: theme.input, borderColor: theme.border, color: theme.text }]} placeholder="Тегло (грама)" placeholderTextColor={theme.muted} value={weight} onChangeText={setWeight} keyboardType="numeric" />
-        <TextInput style={[styles.input, styles.numInput, { backgroundColor: theme.input, borderColor: theme.border, color: theme.text }]} placeholder="Капацитет (брой патрони)" placeholderTextColor={theme.muted} value={capacity} onChangeText={setCapacity} keyboardType="numeric" />
-
+        <TextInput 
+          style={[styles.input, { backgroundColor: theme.input, borderColor: theme.border, color: theme.accent }]} 
+          placeholder="Незареден грамаж" 
+          placeholderTextColor={theme.muted} 
+          value={weight} 
+          onChangeText={setWeight} 
+          keyboardType="numeric" 
+        />
+        <TextInput 
+          style={[styles.input, { backgroundColor: theme.input, borderColor: theme.border, color: theme.accent }]} 
+          placeholder="Зареден капацитет - 16" 
+          placeholderTextColor={theme.muted} 
+          value={capacity} 
+          onChangeText={setCapacity} 
+          keyboardType="numeric" 
+        />
         <Text style={[styles.label, { color: theme.accent }]}>Визуална Идентификация</Text>
         <TouchableOpacity style={[styles.imagePickerArea, { backgroundColor: theme.input, borderColor: imageSelectorPressed ? 'transparent' : theme.border }]} onPress={handleImageSelection} activeOpacity={0.7} onPressIn={() => setImageSelectorPressed(true)} onPressOut={() => setImageSelectorPressed(false)}>
           {imageObject ? (
@@ -324,11 +367,16 @@ export default function AddGunScreen() {
             </View>
           )}
         </TouchableOpacity>
-
-        <TouchableOpacity style={[styles.saveBtn, { backgroundColor: theme.accent, opacity: loading ? 0.7 : 1 }]} onPress={handleSave} disabled={loading}>
-          {loading ? <ActivityIndicator color="#000" /> : <Text style={styles.saveBtnText}>ДОБАВИ ОРЪЖИЕ</Text>}
+        <TouchableOpacity 
+          style={[styles.saveBtn, { borderColor: theme.accent, opacity: loading ? 0.7 : 1 }]} 
+          onPress={handleSave} 
+          disabled={loading}>
+          {loading ? (
+            <ActivityIndicator color={theme.accent} /> 
+          ) : (
+            <Text style={[styles.saveBtnText, { color: theme.accent }]}>ДОБАВИ ОРЪЖИЕ</Text>
+          )}
         </TouchableOpacity>
-        
         <View style={{ height: 100 }} />
       </ScrollView>
     </View>
@@ -336,12 +384,22 @@ export default function AddGunScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 }, scroll: { paddingHorizontal: 20 }, title: { fontSize: 26, fontWeight: '900'},
-  label: { fontSize: 10, letterSpacing: 1.5, fontWeight: '800', marginTop: 15, marginBottom: 10 },
+  container: { flex: 1 }, scroll: { paddingHorizontal: 15 }, title: { fontSize: 26, fontWeight: '900', marginBottom: 20, letterSpacing: 1 },
+  label: { fontSize: 10, letterSpacing: 1.5, fontWeight: '800', marginTop: 15, marginBottom: 5 },
   input: { borderRadius: Radius.md, padding: Spacing.md, borderWidth: 1, marginBottom: 10 }, 
   numInput: { fontSize: 13 },
-  saveBtn: { marginTop: 30, padding: 18, borderRadius: Radius.md, alignItems: 'center' },
-  saveBtnText: { color: '#000', fontWeight: '900', letterSpacing: 2, fontSize: 14 },
+  saveBtn: { 
+    marginTop: 30, 
+    padding: 16, 
+    borderRadius: 12, 
+    borderWidth: 2, 
+    alignItems: 'center' 
+  },
+  saveBtnText: { 
+    fontWeight: '800', 
+    letterSpacing: 1, 
+    fontSize: 14 
+  },
   imagePickerArea: { height: 180, borderRadius: Radius.lg, borderWidth: 1, overflow: 'hidden', justifyContent: 'center', alignItems: 'center' },
   imagePreview: { width: '100%', height: '100%', resizeMode: 'cover' },
   placeholderBox: { alignItems: 'center' },

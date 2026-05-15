@@ -1,5 +1,4 @@
 export const Colors = {
-  // Core backgrounds
   bg: {
     deep: '#0A0B0D',
     base: '#0F1114',
@@ -8,16 +7,12 @@ export const Colors = {
     input: '#13171C',
     overlay: 'rgba(0,0,0,0.75)',
   },
-
-  // Borders
   border: {
     subtle: '#252C35',
     default: '#2E3844',
     strong: '#3D4F61',
     accent: '#4A6080',
   },
-
-  // Text
   text: {
     primary: '#E8EDF2',
     secondary: '#8A9BB0',
@@ -25,8 +20,6 @@ export const Colors = {
     inverse: '#0A0B0D',
     accent: '#C5D8F0',
   },
-
-  // Status / KOS health
   status: {
     good: {
       bg: 'rgba(34, 197, 94, 0.12)',
@@ -47,8 +40,6 @@ export const Colors = {
       dot: '#EF4444',
     },
   },
-
-  // Accent
   accent: {
     steel: '#4A7FA5',
     steelLight: '#6EA8D0',
@@ -56,8 +47,6 @@ export const Colors = {
     amber: '#D97706',
     amberLight: '#F59E0B',
   },
-
-  // Gun type colors
   type: {
     handgun: '#5B8FB9',
     rifle: '#6B8F6E',
@@ -67,7 +56,6 @@ export const Colors = {
 };
 
 export const Fonts = {
-  // Use system fonts to avoid native font loading complexity
   mono: 'Courier New',
   heading: 'System',
 };

@@ -10,8 +10,6 @@ import { ThemeProvider, useTheme } from '../context/ThemeContext';
 import OnboardingScreen from './onboarding';
 
 LogBox.ignoreLogs(['expo-notifications: Android Push notifications']);
-
-// --- INNER APP NAVIGATOR (CAN USE THEME) ---
 function AppNavigator() {
   const { theme, themeName } = useTheme();
   const [session, setSession] = useState<Session | null>(null);
@@ -50,11 +48,8 @@ function AppNavigator() {
   }
 
   const activeTextColor = themeName === 'industrial' ? theme.accent : theme.text;
-
   if (!isReady) return <><StatusBar style="light" /><View style={{ flex: 1, backgroundColor: theme.bg }} /></>;
-
   if (needsOnboarding) return <OnboardingScreen onFinish={() => setNeedsOnboarding(false)} />;
-
   if (!session) {
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: theme.bg }}>
@@ -85,7 +80,6 @@ function AppNavigator() {
       </SafeAreaView>
     );
   }
-
   return (
     <>
       <StatusBar style="light" />
@@ -98,7 +92,6 @@ function AppNavigator() {
   );
 }
 
-// --- ROOT WRAPPER ---
 export default function RootLayout() {
   return (
     <ThemeProvider>

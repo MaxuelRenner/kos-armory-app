@@ -40,12 +40,12 @@ function SpecRow({ label, value }: { label: string; value: string }) {
 }
 
 const INITIAL_CHECKLIST = [
-  { id: 'form', label: 'Заявление по образец', info: 'Взема се на място от гише КОС или се изтегля от сайта на МВР.', checked: false },
-  { id: 'idCard', label: 'Лична карта (копие)', info: 'Копие от двете страни. Носете и оригинала за сверка.', checked: false },
+  { id: 'form', label: 'Заявление по образец', info: 'Взема се на място от гише на служба КОС или се изтегля от сайта на МВР.', checked: false },
+  { id: 'idCard', label: 'Лична карта (копие)', info: 'Копие от двете страни. Носете и оригинала за сверяване.', checked: false },
   { id: 'criminalRecord', label: 'Свидетелство за съдимост', info: 'Важи 6 месеца. Изважда се от Районния съд.', checked: false },
   { id: 'medical', label: 'Медицинско свидетелство', info: 'От психодиспансер + печат от личен лекар. Важи 6 месеца.', checked: false },
-  { id: 'fee', label: 'Платена държавна такса', info: 'Плаща се на гише или по банков път към МВР.', checked: false },
-  { id: 'technical', label: 'Удостоверение за годност', info: 'Издава се от лицензиран оръжеен майстор след преглед.', checked: false },
+  { id: 'fee', label: 'Платена държавна такса', info: 'Плаща се на гише или се прави онлайн превод към МВР.', checked: false },
+  { id: 'technical', label: 'Удостоверение за завършен курс', info: 'Удостоверение за безопасно боравене с огнестрелно оръжие.', checked: false },
 ];
 
 export default function GunDetailScreen() {
@@ -85,14 +85,13 @@ export default function GunDetailScreen() {
       const fileName = `gun_${Date.now()}.${fileExt}`;
       const formData = new FormData();
       formData.append('file', { uri, name: fileName, type: `image/${fileExt === 'jpg' ? 'jpeg' : fileExt}` } as any);
-      
       const { error: uploadError } = await supabase.storage.from('gun-images').upload(fileName, formData);
       if (!uploadError) {
         const { data: publicUrlData } = supabase.storage.from('gun-images').getPublicUrl(fileName);
         await supabase.from('firearms').update({ image_url: publicUrlData.publicUrl }).eq('id', id);
         fetchGunDetails();
       }
-    } catch (err) { console.error(err); Alert.alert("Грешка", "Снимката не бе запазена."); }
+    } catch (err) { console.error(err); Alert.alert("Грешка", "Снимката не бе запазена!"); }
     setLoading(false);
   };
 
@@ -104,7 +103,7 @@ export default function GunDetailScreen() {
 
   async function requestPermissions() {
     const { status } = await Notifications.requestPermissionsAsync();
-    if (status !== 'granted') Alert.alert('Внимание', 'Моля разрешете известията.');
+    if (status !== 'granted') Alert.alert('Внимание', 'Моля разрешете известията!');
   }
 
   async function fetchGunDetails() {
@@ -115,10 +114,8 @@ export default function GunDetailScreen() {
       const expiryDate = new Date(activeDate.setFullYear(activeDate.getFullYear() + 5));
       const isoExpiry = expiryDate.toISOString().split('T')[0];
       const days = getDaysUntilExpiry(isoExpiry);
-      
       let status: GunStatus = 'good';
       if (days <= 0) status = 'danger'; else if (days <= 30) status = 'warning'; 
-      
       setGun({ ...data, kosExpiryDate: isoExpiry, kosStatus: status, daysUntilExpiry: days });
     }
     setLoading(false);
@@ -143,11 +140,10 @@ export default function GunDetailScreen() {
   const allDocsCollected = completedDocsCount === checklist.length;
   const isWithinRenewalWindow = gun?.daysUntilExpiry <= 30;
   const canRenew = allDocsCollected && isWithinRenewalWindow;
-
   const handleRenewKOS = async () => {
     Alert.alert(
-      "Подновяване на КОС",
-      "Сигурни ли сте, че сте подали всички документи и искате да подновите разрешителното за нови 5 години?",
+      "Подновяване на разрешително",
+      "Сигурни ли сте, че сте подали всички документи и искате да подновите разрешителното за следващите 5 години?",
       [
         { text: "Отказ", style: "cancel" },
         { 
@@ -155,9 +151,7 @@ export default function GunDetailScreen() {
           onPress: async () => {
             setLoading(true);
             const today = new Date().toISOString().split('T')[0];
-            
             const { error } = await supabase.from('firearms').update({ last_renewed_date: today }).eq('id', id);
-            
             if (error) {
               Alert.alert("Грешка", error.message);
             } else {
@@ -165,7 +159,7 @@ export default function GunDetailScreen() {
               setChecklist(resetList);
               await AsyncStorage.setItem(`kos_checklist_${id}`, JSON.stringify(resetList));
               
-              Alert.alert("Успешно!", "Разрешителното е подновено за нови 5 години!");
+              Alert.alert("Успешно!", "Разрешителното е подновено за следващите 5 години!");
               fetchGunDetails();
             }
             setLoading(false);
@@ -177,25 +171,18 @@ export default function GunDetailScreen() {
 
   const handleTraining = async () => {
     const now = new Date().toISOString();
-
-    // 1. Instantly update UI
     setGun((prev: any) => {
       if (!prev) return prev;
       return { ...prev, training_count: (prev.training_count || 0) + 1, needs_cleaning: true, last_range_day: now };
     });
-
-    // 2. Show the missing visual confirmation
-    Alert.alert("Тренировката е записана!", "Не забравяйте да почистите оръжието си след стрелба.");
-
-    // 3. Schedule an actual background Push Notification for 1 hour from now
+    Alert.alert("Тренировката е записана!", "Не забравяйте да почиствате оръжието си след стрелба.");
     try {
       await Notifications.scheduleNotificationAsync({
         content: {
-          title: "🔫 Време за почистване!",
+          title: "Време за почистване!",
           body: `Оръжието ви има нужда от почистване след днешната тренировка.`,
           sound: true,
         },
-        // 👈 FIXED: Expo strictly requires the 'type' property now!
         trigger: { 
           type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
           seconds: 3600, 
@@ -206,8 +193,6 @@ export default function GunDetailScreen() {
     } catch (e) { 
       console.error(e); 
     }
-
-    // 4. Update Supabase silently in background
     supabase.from('firearms').update({
       training_count: (gun?.training_count || 0) + 1,
       needs_cleaning: true,
@@ -218,26 +203,24 @@ export default function GunDetailScreen() {
   const handleDelete = async () => {
     Alert.alert(
       "Премахване на оръжие",
-      "Сигурни ли сте, че искате да премахнете това оръжие от арсенала? Това действие е необратимо.",
+      "Сигурни ли сте, че искате да премахнете това оръжие от арсенала си? Това действие е необратимо.",
       [
-        { text: "Отказ", style: "cancel" },
-        { 
-          text: "ИЗТРИЙ", 
+        { text: "ОТКАЗ", style: "cancel" },
+        { text: "ИЗТРИЙ", 
           style: "destructive", 
           onPress: async () => {
             setLoading(true);
           try {
             await Notifications.cancelScheduledNotificationAsync(`clean_${id}`);
             await Notifications.cancelScheduledNotificationAsync(`kos_${id}`);
-          } catch(e) {} // Ignores Expo Go error
+          } catch(e) {}
             await AsyncStorage.removeItem(`kos_checklist_${id}`);
             const { error } = await supabase.from('firearms').delete().eq('id', id);
-            
             if (error) {
               Alert.alert("Грешка", error.message);
               setLoading(false);
             } else {
-              Alert.alert("Изтрито", "Оръжието беше премахнато успешно.");
+              Alert.alert("Изтрито", "Оръжието беше премахнато успешно!");
               router.replace('/(tabs)');
             }
           }
@@ -248,22 +231,14 @@ export default function GunDetailScreen() {
 
 const handleClean = async () => {
     const now = new Date().toISOString();
-
-    // 1. Instantly update UI
     setGun((prev: any) => {
       if (!prev) return prev;
       return { ...prev, needs_cleaning: false, last_cleaned_date: now };
     });
-
-    // 2. Show visual confirmation
     Alert.alert("Почистено!", "Оръжието е отбелязано като почистено и поддържано.");
-
-    // 3. Cancel the push notification since you already cleaned it!
     try {
       await Notifications.cancelScheduledNotificationAsync(`clean_${id}`);
     } catch(e) {}
-
-    // 4. Update Supabase silently
     supabase.from('firearms').update({
       needs_cleaning: false,
       last_cleaned_date: now,
@@ -277,7 +252,6 @@ const handleClean = async () => {
     <SafeAreaView style={[styles.container, { backgroundColor: theme.bg }]}>
       <Stack.Screen options={{ title: gun.name, headerStyle: { backgroundColor: theme.bg }, headerTintColor: theme.text }} />
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
-        
         <View style={[styles.heroCard, { backgroundColor: theme.card, borderColor: theme.border, borderTopColor: Colors.status[gun.kosStatus as GunStatus].dot }]}>
           <TouchableOpacity style={styles.heroImageArea} onPress={handleUpdateImage} activeOpacity={0.8}>
             {gun.image_url ? <Image source={{ uri: gun.image_url }} style={styles.heroImage} /> : <Text style={{ color: theme.muted }}>[ДОБАВИ СНИМКА]</Text>}
@@ -285,40 +259,30 @@ const handleClean = async () => {
               <Ionicons name="camera-reverse" size={20} color="#fff" />
             </View>
           </TouchableOpacity>
-          
           <View style={styles.heroInfo}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-              
-              {/* LEFT SIDE: Name & Serial */}
               <View style={{ flex: 1, paddingRight: 10 }}>
                 <Text style={[styles.heroTypeText, { color: theme.accent }]}>{gun.type?.toUpperCase()}</Text>
                 <Text style={[styles.heroName, { color: theme.text }]}>{gun.name}</Text>
                 <Text style={[styles.heroSerial, { color: theme.muted }]}>S/N: {gun.serial_number}</Text>
               </View>
-
-              {/* RIGHT SIDE: Counter & Cleaning Badge */}
               <View style={{ alignItems: 'flex-end', gap: 8 }}>
                 <View style={[styles.counterBox, { backgroundColor: theme.input, borderColor: theme.border }]}>
                   <Text style={[styles.counterNumber, { color: theme.text }]}>{gun.training_count || 0}</Text>
                   <Text style={[styles.counterLabel, { color: theme.muted }]}>ТРЕНИРОВКИ</Text>
                 </View>
-                
-                {/* 👈 THE NEW CLEANING BADGE */}
                 {gun.needs_cleaning && (
                   <View style={styles.cleaningBadge}>
                     <Text style={styles.cleaningBadgeText}>⚠ ЗА ПОЧИСТВАНЕ</Text>
                   </View>
                 )}
               </View>
-
             </View>
-
             <View style={{ marginTop: 12, alignItems: 'flex-start' }}>
               <StatusPill status={gun.kosStatus} expiryDate={gun.kosExpiryDate} />
             </View>
           </View>
         </View>
-
         <View style={styles.actionRow}>
           <TouchableOpacity style={[styles.actionBtn, { backgroundColor: theme.input, borderColor: theme.border }]} onPress={handleTraining}>
             <Ionicons name="flame" size={20} color={theme.accent} />
@@ -329,25 +293,23 @@ const handleClean = async () => {
             <Text style={[styles.actionLabel, { color: theme.text }]}>Почистване</Text>
           </TouchableOpacity>
         </View>
-
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: theme.muted }]}>ДЕТАЙЛИ</Text>
           <View style={[styles.specsCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
             <SpecRow label="Производител" value={gun.manufacturer || '—'} />
             <SpecRow label="Калибър" value={gun.caliber || '—'} />
             <SpecRow label="Тегло" value={gun.weight_grams ? `${gun.weight_grams} гр.` : '—'} />
+            <SpecRow label="Капацитет" value={gun.capacity ? `${gun.capacity - 1} + 1` : '-'}/>
             <SpecRow label="Първа регистрация" value={gun.kos_registration_date} />
             <SpecRow label="Последно подновен" value={gun.last_renewed_date || '—'} />
-            <SpecRow label="КОС изтича на" value={gun.kosExpiryDate} />
+            <SpecRow label="Разрешително изтича на" value={gun.kosExpiryDate} />
           </View>
         </View>
-
         <View style={styles.section}>
           <View style={styles.checklistHeader}>
-            <Text style={[styles.sectionTitle, { color: theme.muted, marginBottom: 0 }]}>ДОКУМЕНТИ ЗА КОС</Text>
+            <Text style={[styles.sectionTitle, { color: theme.muted, marginBottom: 0 }]}>ДОКУМЕНТИ ЗА СЛУЖБА КОС</Text>
             <Text style={{ color: theme.accent, fontSize: 12, fontWeight: '800' }}>{completedDocsCount} / {checklist.length}</Text>
           </View>
-
           {checklist.map((item, index) => (
             <View key={item.id} style={[styles.checklistRow, { alignItems: 'flex-start' }]}>
               <TouchableOpacity style={{ flexDirection: 'row', flex: 1, alignItems: 'center', gap: 12 }} onPress={() => toggleChecklistItem(index)} activeOpacity={0.7}>
@@ -356,28 +318,22 @@ const handleClean = async () => {
                   {item.label}
                 </Text>
               </TouchableOpacity>
-              
-              <TouchableOpacity onPress={() => Linking.openURL('https://mvr.bg/services/administrative-services/weapons')} style={{ padding: 4 }}>
+              <TouchableOpacity onPress={() => Linking.openURL('https://e-uslugi.mvr.bg/services/applicationProcesses/321')} style={{ padding: 4 }}>
                 <Ionicons name="information-circle-outline" size={22} color={theme.accent} />
               </TouchableOpacity>
             </View>
           ))}
-          
           <TouchableOpacity 
             style={[styles.renewBtn, { backgroundColor: canRenew ? theme.accent : theme.input, borderColor: theme.border, opacity: canRenew ? 1 : 0.6 }]} 
             disabled={!canRenew}
-            onPress={handleRenewKOS}
-          >
+            onPress={handleRenewKOS}>
             <Text style={[styles.renewBtnText, { color: canRenew ? 'white' : theme.muted }]}>
-              {canRenew ? "ПОДНОВИ КОС" : "ЗАКЛЮЧЕНО"}
+              {canRenew ? "ПОДНОВИ РАЗРЕШИТЕЛНО" : "ЗАКЛЮЧЕНО"}
             </Text>
           </TouchableOpacity>
-          
-          {!isWithinRenewalWindow && <Text style={[styles.helperText, { color: theme.muted }]}>* Опцията се отключва 30 дни преди изтичане</Text>}
-          {isWithinRenewalWindow && !allDocsCollected && <Text style={[styles.helperText, { color: theme.accent }]}>* Отбележете всички документи за да подновите</Text>}
-
+          {!isWithinRenewalWindow && <Text style={[styles.helperText, { color: theme.muted }]}>* Опцията се отключва 30 дни преди изтичане *</Text>}
+          {isWithinRenewalWindow && !allDocsCollected && <Text style={[styles.helperText, { color: theme.accent }]}>* Отбележете всички документи за да подновите *</Text>}
         </View>
-
         <TouchableOpacity style={[styles.deleteBtn, { borderTopColor: theme.border }]} onPress={handleDelete}>
           <Text style={styles.deleteText}>ПРЕМАХНИ ОТ АРСЕНАЛА</Text>
         </TouchableOpacity>
@@ -392,14 +348,11 @@ const styles = StyleSheet.create({
   heroCard: { borderRadius: Radius.xl, borderTopWidth: 4, borderWidth: 1, marginBottom: Spacing.md, overflow: 'hidden' },
   heroImageArea: { height: 220, width: '100%', backgroundColor: '#000', justifyContent: 'center', alignItems: 'center' }, heroImage: { width: '100%', height: '100%', resizeMode: 'cover' },
   heroInfo: { padding: Spacing.md, gap: 4 }, heroTypeText: { fontSize: 11, fontWeight: '800', letterSpacing: 1.5, marginBottom: 2 }, heroName: { fontSize: 32, fontWeight: '900', lineHeight: 36 }, heroSerial: { fontSize: 12, fontFamily: 'Courier New', marginTop: 4 },
-  
-  // NEW COUNTER STYLES
   counterBox: { paddingHorizontal: 16, paddingVertical: 10, borderRadius: 14, borderWidth: 1, alignItems: 'center', justifyContent: 'center', minWidth: 90 },
   counterNumber: { fontSize: 26, fontWeight: '900' },
   counterLabel: { fontSize: 9, fontWeight: '800', letterSpacing: 1, marginTop: 2 },
   cleaningBadge: { backgroundColor: 'rgba(245,158,11,0.12)', borderWidth: 1, borderColor: 'rgba(245,158,11,0.35)', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 4, alignItems: 'center' },
   cleaningBadgeText: { fontSize: 9, fontWeight: '800', color: '#FCD34D', letterSpacing: 0.5 },
-
   statusPill: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 20, borderWidth: 1, alignSelf: 'flex-start' }, statusDot: { width: 6, height: 6, borderRadius: 3 }, statusPillText: { fontSize: 10, fontWeight: '800' }, statusDaysText: { fontSize: 10, opacity: 0.8 },
   actionRow: { flexDirection: 'row', gap: 10, marginBottom: 15 }, actionBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, padding: 15, borderRadius: 12, borderWidth: 1 }, actionLabel: { fontWeight: '700', fontSize: 13 },
   section: { marginBottom: Spacing.lg }, checklistHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, paddingHorizontal: 5 },
